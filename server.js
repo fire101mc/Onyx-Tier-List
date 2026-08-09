@@ -431,14 +431,9 @@ http.createServer(async(req,res)=>{
     // ---------- ADMIN REMOVE PLAYER ----------
     if(u.pathname==="/api/admin/players" && req.method==="DELETE"){
       if(!requireAdmin(req,res)) return authError(res);
-      if(ONYX_INGEST_TOKEN){
-        const supplied=req.headers["x-onyx-token"] || "";
-        if(supplied !== ONYX_INGEST_TOKEN){
-          res.writeHead(401,{"Content-Type":"application/json"});
-          return res.end(JSON.stringify({error:"invalid ONYX token"}));
-        }
-      }
-
+      // Admin session authentication above is sufficient for dashboard deletes.
+      // Do NOT require the server-to-server ingest token here: the browser admin
+      // dashboard must never receive that private token.
       const x=await body(req);
       const key=String(x.identifier||"").trim().toLowerCase();
       const database=String(x.database||"").toLowerCase();
