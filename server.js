@@ -23,7 +23,6 @@ function loadDotEnv(){
 loadDotEnv();
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, "0.0.0.0");
 const ROOT = __dirname;
 const DB_FILE = path.join(ROOT, "onyx-db.json");
 const PLAYED_DB_FILE = path.join(ROOT, "played-players.json");
