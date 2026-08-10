@@ -291,11 +291,19 @@ http.createServer(async(req,res)=>{
       const x=await body(req);
       if(!x.name)throw new Error("name required");
       const played=readPlayedDB();
-      let p=played.players.find(v=>v.name.toLowerCase()===String(x.name).toLowerCase());
+      const incomingName=String(x.name).trim();
+      const incomingUuid=String(x.uuid||"").replace(/-/g,"").toLowerCase();
+      const sameIdentity=(v)=>{
+        const vuuid=String(v.uuid||"").replace(/-/g,"").toLowerCase();
+        return (incomingUuid && vuuid && incomingUuid===vuuid) ||
+               String(v.name||"").trim().toLowerCase()===incomingName.toLowerCase();
+      };
+      let matches=played.players.filter(sameIdentity);
+      let p=matches[0];
       if(!p){
         p={
           id:Date.now().toString(36),
-          name:String(x.name),
+          name:incomingName,
           uuid:x.uuid||"",
           region:x.region||"—",
           firstSeenAt:new Date().toISOString(),
@@ -304,10 +312,22 @@ http.createServer(async(req,res)=>{
         };
         played.players.push(p);
       }else{
-        p.uuid=x.uuid??p.uuid;
+        p.name=incomingName || p.name;
+        p.uuid=x.uuid||p.uuid;
         p.region=x.region??p.region;
         p.lastSeenAt=new Date().toISOString();
         p.joins=Number(p.joins||0)+1;
+        // Collapse any legacy duplicate records for this same player.
+        if(matches.length>1){
+          for(const dup of matches.slice(1)){
+            p.joins += Number(dup.joins||0);
+            if(!p.firstSeenAt || (dup.firstSeenAt && dup.firstSeenAt<p.firstSeenAt)) p.firstSeenAt=dup.firstSeenAt;
+            if(!p.uuid && dup.uuid) p.uuid=dup.uuid;
+            if((!p.skinUrl || !p.skinFetchedAt) && dup.skinUrl){ p.skinUrl=dup.skinUrl; p.skinFetchedAt=dup.skinFetchedAt; }
+          }
+          const ids=new Set(matches.slice(1).map(v=>v.id));
+          played.players=played.players.filter(v=>!ids.has(v.id));
+        }
       }
       await enrichSkin(p);
       writePlayedDB(played);

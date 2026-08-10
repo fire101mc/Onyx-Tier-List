@@ -20,7 +20,7 @@ public final class OnyxPlayedSync extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        apiUrl = getConfig().getString("api-url", "http://127.0.0.1:3000/api/players/played");
+        apiUrl = getConfig().getString("api-url", "https://onyx-tier-list.onrender.com/api/players/played");
         token = getConfig().getString("token", "");
         http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))

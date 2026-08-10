@@ -184,7 +184,7 @@ document.getElementById("removeBtn").addEventListener("click", async()=>{
     if(data.removedOnyx) removed.push("ONYX");
     out.textContent="✅ Removed from "+(removed.length ? removed.join(" + ") : label)+": "+identifier;
     document.getElementById("removeIdentifier").value="";
-    checkConnection();
+    await checkConnection();
   }catch(e){
     out.textContent="❌ "+e.message;
   }
