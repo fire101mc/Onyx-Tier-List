@@ -1,0 +1,3 @@
+# Onyx PvP -> Onyx website sync
+api-url: "https://onyx-tier-list.onrender.com/api/pvp/match"
+token: "PASTE_THE_PRIVATE_ONYX_INGEST_TOKEN_HERE"

@@ -79,6 +79,13 @@ function requireAdmin(req,res){
   return true;
 }
 function authError(res){ return sendJSON(res,{error:"admin authentication required"},401); }
+function adminOrIngest(req,res){
+  if(requireAdmin(req,res)) return true;
+  if(!ONYX_INGEST_TOKEN) return false;
+  const supplied=req.headers["x-onyx-token"] || "";
+  return supplied === ONYX_INGEST_TOKEN;
+}
+
 
 function getJSON(url){
   return new Promise((resolve,reject)=>{
@@ -333,6 +340,54 @@ const server = http.createServer(async(req,res)=>{
       return sendJSON(res,{ok:true});
     }
     if(u.pathname==="/api/auth/me" && req.method==="GET") return sendJSON(res,{authenticated:requireAdmin(req,res)});
+
+    // Ranked PvP sync: Minecraft OnyxPvP sends {name, uuid, kit, elo, rank} after a match/admin ELO change.
+    // This endpoint uses the same private ingest token as the PLAYED sync and writes to PostgreSQL-backed ONYX data.
+    if(u.pathname==="/api/pvp/match" && req.method==="POST"){
+      if(!adminOrIngest(req,res)) return authError(res);
+      const x=await body(req);
+      if(!x.name || !x.kit || x.elo==null || !x.rank) throw new Error("name, kit, elo and rank required");
+      const name=String(x.name).trim();
+      const uuid=String(x.uuid||"");
+      const rawKit=String(x.kit).trim().toLowerCase();
+      const kitMap={nethpot:"nethop",nethop:"nethop",diapot:"pot",pot:"pot",nodebuff:"pot",builduhc:"uhc",uhc:"uhc"};
+      const kit=kitMap[rawKit] || rawKit;
+      const elo=Number(x.elo);
+      const rank=String(x.rank);
+
+      const played=readPlayedDB();
+      let playedPlayer=played.players.find(v =>
+        String(v.name||"").toLowerCase()===name.toLowerCase() ||
+        (uuid && String(v.uuid||"").replace(/-/g,"").toLowerCase()===uuid.replace(/-/g,"").toLowerCase())
+      );
+      if(!playedPlayer){
+        playedPlayer={id:Date.now().toString(36),name,uuid,region:"—",firstSeenAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),joins:0};
+        played.players.push(playedPlayer);
+      }else{
+        playedPlayer.name=name || playedPlayer.name;
+        playedPlayer.uuid=uuid || playedPlayer.uuid;
+        playedPlayer.lastSeenAt=new Date().toISOString();
+      }
+      await writePlayedDB(played);
+
+      let p=db.players.find(v =>
+        String(v.name||"").toLowerCase()===name.toLowerCase() ||
+        (uuid && String(v.uuid||"").replace(/-/g,"").toLowerCase()===uuid.replace(/-/g,"").toLowerCase())
+      );
+      if(!p){
+        p={id:playedPlayer.uuid || ("onyx_"+Date.now()),name:playedPlayer.name,uuid:playedPlayer.uuid||uuid,region:playedPlayer.region||"—",points:0,rankings:{},testedAt:new Date().toISOString()};
+        db.players.push(p);
+      }
+      p.name=playedPlayer.name||p.name;
+      p.uuid=playedPlayer.uuid||p.uuid;
+      if(!p.rankings)p.rankings={};
+      p.rankings[kit]={rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"};
+      p.points=Object.values(p.rankings).reduce((sum,v)=>sum+Number(v?.points||0),0);
+      if(!Array.isArray(db.tests))db.tests=[];
+      db.tests.push({playerId:p.id,kit,rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"});
+      await writeDB(db);
+      return sendJSON(res,{ok:true,player:p,kit,elo,rank});
+    }
 
     // PLAYED database: every player who has joined/played on the ONYX server.
     if(u.pathname==="/api/players/played" && req.method==="GET"){
