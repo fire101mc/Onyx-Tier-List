@@ -9,6 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const crypto = require("crypto");
+const { Pool } = require("pg");
 
 function loadDotEnv(){
   const file=path.join(__dirname,".env");
@@ -24,8 +25,17 @@ loadDotEnv();
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const DB_FILE = path.join(ROOT, "onyx-db.json");
-const PLAYED_DB_FILE = path.join(ROOT, "played-players.json");
+const DATABASE_URL = process.env.DATABASE_URL || "";
+if(!DATABASE_URL){
+  console.error("DATABASE_URL is required. Configure a PostgreSQL database before starting Onyx.");
+  process.exit(1);
+}
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: false }
+});
+let dbCache = {players:[], tests:[]};
+let playedCache = {players:[]};
 const ONYX_INGEST_TOKEN = process.env.ONYX_INGEST_TOKEN || "";
 const MCPVP_DATA = "https://www.mcpvp.com/tiers/data";
 const MCPVP_HTML = "https://www.mcpvp.com/tiers";
@@ -149,18 +159,75 @@ async function enrichSkinList(list){
 }
 
 function readDB(){
-  try { return JSON.parse(fs.readFileSync(DB_FILE, "utf8")); }
-  catch { return {players:[], tests:[]}; }
+  return dbCache;
 }
-function writeDB(db){
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+async function writeDB(db){
+  dbCache = db;
+  await pool.query(
+    `INSERT INTO onyx_store (id, data, updated_at)
+     VALUES (1, $1::jsonb, NOW())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+    [JSON.stringify(db)]
+  );
 }
 function readPlayedDB(){
-  try { return JSON.parse(fs.readFileSync(PLAYED_DB_FILE, "utf8")); }
-  catch { return {players:[]}; }
+  return playedCache;
 }
-function writePlayedDB(db){
-  fs.writeFileSync(PLAYED_DB_FILE, JSON.stringify(db, null, 2), "utf8");
+async function writePlayedDB(db){
+  playedCache = db;
+  await pool.query(
+    `INSERT INTO played_store (id, data, updated_at)
+     VALUES (1, $1::jsonb, NOW())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+    [JSON.stringify(db)]
+  );
+}
+
+async function initDatabase(){
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS onyx_store (
+      id INTEGER PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS played_store (
+      id INTEGER PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  const onyxResult = await pool.query("SELECT data FROM onyx_store WHERE id = 1");
+  const playedResult = await pool.query("SELECT data FROM played_store WHERE id = 1");
+
+  if(onyxResult.rowCount){
+    dbCache = onyxResult.rows[0].data || {players:[], tests:[]};
+  }else{
+    const seedPath = path.join(ROOT, "onyx-db.json");
+    try{
+      dbCache = JSON.parse(fs.readFileSync(seedPath, "utf8"));
+      if(!dbCache.players) dbCache.players=[];
+      if(!dbCache.tests) dbCache.tests=[];
+    }catch{
+      dbCache = {players:[], tests:[]};
+    }
+    await writeDB(dbCache);
+  }
+
+  if(playedResult.rowCount){
+    playedCache = playedResult.rows[0].data || {players:[]};
+  }else{
+    const seedPath = path.join(ROOT, "played-players.json");
+    try{
+      playedCache = JSON.parse(fs.readFileSync(seedPath, "utf8"));
+      if(!playedCache.players) playedCache.players=[];
+    }catch{
+      playedCache = {players:[]};
+    }
+    await writePlayedDB(playedCache);
+  }
+
+  console.log(`Persistent PostgreSQL storage ready: ${dbCache.players.length} ONYX players, ${playedCache.players.length} played players.`);
 }
 function getText(url){
   return new Promise((resolve,reject)=>{
@@ -234,7 +301,7 @@ function body(req){
 }
 const mime={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".gif":"image/gif"};
 
-http.createServer(async(req,res)=>{
+const server = http.createServer(async(req,res)=>{
   const origin=req.headers.origin;
   if(FRONTEND_ORIGIN && origin===FRONTEND_ORIGIN){
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -271,7 +338,7 @@ http.createServer(async(req,res)=>{
     if(u.pathname==="/api/players/played" && req.method==="GET"){
       const played=readPlayedDB();
       await enrichSkinList(played.players);
-      writePlayedDB(played);
+      await writePlayedDB(played);
       res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
       return res.end(JSON.stringify(played.players));
     }
@@ -330,7 +397,7 @@ http.createServer(async(req,res)=>{
         }
       }
       await enrichSkin(p);
-      writePlayedDB(played);
+      await writePlayedDB(played);
       res.writeHead(200,{"Content-Type":"application/json"});
       return res.end(JSON.stringify(p));
     }
@@ -359,8 +426,8 @@ http.createServer(async(req,res)=>{
           source.skinFetchedAt=p.skinFetchedAt;
         }
       }
-      writePlayedDB(played);
-      writeDB(db);
+      await writePlayedDB(played);
+      await writeDB(db);
       res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
       return res.end(JSON.stringify(db.players));
     }
@@ -393,7 +460,7 @@ http.createServer(async(req,res)=>{
         p.uuid=playedPlayer.uuid||p.uuid;
         p.region=playedPlayer.region||p.region;
       }
-      writeDB(db);
+      await writeDB(db);
       res.writeHead(200,{"Content-Type":"application/json"});
       return res.end(JSON.stringify(p));
     }
@@ -434,7 +501,7 @@ http.createServer(async(req,res)=>{
       p.rankings[x.kit]={rank:x.rank,points:Number(x.points||0),tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""};
       p.points=Object.values(p.rankings).reduce((s,v)=>s+Number(v.points||0),0);
       db.tests.push({playerId:p.id,kit:x.kit,rank:x.rank,points:Number(x.points||0),tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""});
-      writeDB(db); res.writeHead(200,{"Content-Type":"application/json"}); return res.end(JSON.stringify(p));
+      await writeDB(db); res.writeHead(200,{"Content-Type":"application/json"}); return res.end(JSON.stringify(p));
     }
 
     if(u.pathname==="/api/mcpvp/players" && req.method==="GET"){
@@ -471,7 +538,7 @@ http.createServer(async(req,res)=>{
           String(p.uuid||"").toLowerCase()!==key
         );
         removedPlayed=played.players.length < before;
-        if(removedPlayed)writePlayedDB(played);
+        if(removedPlayed)await writePlayedDB(played);
       }
 
       if(database==="onyx" || database==="both"){
@@ -487,7 +554,7 @@ http.createServer(async(req,res)=>{
           // Remove the associated test records as well, so deleted players
           // don't leave orphaned tier-test history.
           tierDB.tests=(tierDB.tests||[]).filter(t=>!ids.has(t.playerId));
-          writeDB(tierDB);
+          await writeDB(tierDB);
           removedOnyx=true;
         }
       }
@@ -515,4 +582,11 @@ http.createServer(async(req,res)=>{
   }catch(e){
     console.error(e);res.writeHead(400,{"Content-Type":"application/json"});res.end(JSON.stringify({error:e.message}));
   }
-}).listen(PORT,()=>console.log(`Onyx Tier List running at http://localhost:${PORT}`));
+});
+
+initDatabase()
+  .then(()=>server.listen(PORT,()=>console.log(`Onyx Tier List running at http://localhost:${PORT}`)))
+  .catch(err=>{
+    console.error("Failed to initialize PostgreSQL storage:", err);
+    process.exit(1);
+  });

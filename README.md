@@ -92,3 +92,23 @@ The Minecraft plugin ingest token is also generated randomly by `SETUP_ADMIN.bat
 **Do not put admin passwords, password hashes, session secrets, or ingest tokens into `config.js`, HTML, JavaScript, or any GitHub-tracked file.**
 
 For production, host `server.js` on a backend service that supports environment variables/secrets. GitHub Pages can host the public frontend, but it cannot securely run this Node backend. Set `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`, and `ONYX_INGEST_TOKEN` as backend environment secrets.
+
+
+## Persistent PostgreSQL storage (Render-safe)
+
+ONYX now stores its live data in PostgreSQL instead of writing changes back to `onyx-db.json` and `played-players.json`.
+
+The server requires the `DATABASE_URL` environment variable. On Render, add `DATABASE_URL` to the service's Environment settings and point it at a PostgreSQL database you want to keep permanently. The application automatically creates its two storage tables on startup.
+
+On the first startup, if the PostgreSQL tables are empty, ONYX imports the existing `onyx-db.json` and `played-players.json` files as seed data. After that, all changes are written to PostgreSQL. The JSON files are no longer used as live storage, so Render restarts/spin-downs cannot erase newly saved tier or played-player data.
+
+**Important:** Render's temporary/free PostgreSQL offerings may have their own expiration or limits. For permanent ONYX data, use a PostgreSQL provider/plan with persistence that matches your needs. The app is compatible with any standard PostgreSQL connection URL.
+
+### Render environment variables
+
+Set these in Render's Environment settings (do not commit them to Git):
+
+- `DATABASE_URL` — your PostgreSQL connection string.
+- `DATABASE_SSL` — leave unset for normal hosted PostgreSQL; set to `false` only for a database that explicitly does not require TLS.
+
+Your existing `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`, `ONYX_INGEST_TOKEN`, and optional `FRONTEND_ORIGIN` variables remain unchanged.
