@@ -112,7 +112,3 @@ Set these in Render's Environment settings (do not commit them to Git):
 - `DATABASE_SSL` — leave unset for normal hosted PostgreSQL; set to `false` only for a database that explicitly does not require TLS.
 
 Your existing `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`, `ONYX_INGEST_TOKEN`, and optional `FRONTEND_ORIGIN` variables remain unchanged.
-
-### Ranked PvP sync
-
-`POST /api/pvp/match` accepts `{name, uuid, kit, elo, rank}` with the same `X-Onyx-Token` ingest header used by the PLAYED sync. The endpoint maps `nethpot` → `nethop`, `diapot`/`pot` → `pot`, and writes the player's current PvP ELO/tier into the PostgreSQL-backed ONYX ranking record.

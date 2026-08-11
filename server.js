@@ -79,13 +79,6 @@ function requireAdmin(req,res){
   return true;
 }
 function authError(res){ return sendJSON(res,{error:"admin authentication required"},401); }
-function adminOrIngest(req,res){
-  if(requireAdmin(req,res)) return true;
-  if(!ONYX_INGEST_TOKEN) return false;
-  const supplied=req.headers["x-onyx-token"] || "";
-  return supplied === ONYX_INGEST_TOKEN;
-}
-
 
 function getJSON(url){
   return new Promise((resolve,reject)=>{
@@ -341,54 +334,6 @@ const server = http.createServer(async(req,res)=>{
     }
     if(u.pathname==="/api/auth/me" && req.method==="GET") return sendJSON(res,{authenticated:requireAdmin(req,res)});
 
-    // Ranked PvP sync: Minecraft OnyxPvP sends {name, uuid, kit, elo, rank} after a match/admin ELO change.
-    // This endpoint uses the same private ingest token as the PLAYED sync and writes to PostgreSQL-backed ONYX data.
-    if(u.pathname==="/api/pvp/match" && req.method==="POST"){
-      if(!adminOrIngest(req,res)) return authError(res);
-      const x=await body(req);
-      if(!x.name || !x.kit || x.elo==null || !x.rank) throw new Error("name, kit, elo and rank required");
-      const name=String(x.name).trim();
-      const uuid=String(x.uuid||"");
-      const rawKit=String(x.kit).trim().toLowerCase();
-      const kitMap={nethpot:"nethop",nethop:"nethop",diapot:"pot",pot:"pot",nodebuff:"pot",builduhc:"uhc",uhc:"uhc"};
-      const kit=kitMap[rawKit] || rawKit;
-      const elo=Number(x.elo);
-      const rank=String(x.rank);
-
-      const played=readPlayedDB();
-      let playedPlayer=played.players.find(v =>
-        String(v.name||"").toLowerCase()===name.toLowerCase() ||
-        (uuid && String(v.uuid||"").replace(/-/g,"").toLowerCase()===uuid.replace(/-/g,"").toLowerCase())
-      );
-      if(!playedPlayer){
-        playedPlayer={id:Date.now().toString(36),name,uuid,region:"—",firstSeenAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),joins:0};
-        played.players.push(playedPlayer);
-      }else{
-        playedPlayer.name=name || playedPlayer.name;
-        playedPlayer.uuid=uuid || playedPlayer.uuid;
-        playedPlayer.lastSeenAt=new Date().toISOString();
-      }
-      await writePlayedDB(played);
-
-      let p=db.players.find(v =>
-        String(v.name||"").toLowerCase()===name.toLowerCase() ||
-        (uuid && String(v.uuid||"").replace(/-/g,"").toLowerCase()===uuid.replace(/-/g,"").toLowerCase())
-      );
-      if(!p){
-        p={id:playedPlayer.uuid || ("onyx_"+Date.now()),name:playedPlayer.name,uuid:playedPlayer.uuid||uuid,region:playedPlayer.region||"—",points:0,rankings:{},testedAt:new Date().toISOString()};
-        db.players.push(p);
-      }
-      p.name=playedPlayer.name||p.name;
-      p.uuid=playedPlayer.uuid||p.uuid;
-      if(!p.rankings)p.rankings={};
-      p.rankings[kit]={rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"};
-      p.points=Object.values(p.rankings).reduce((sum,v)=>sum+Number(v?.points||0),0);
-      if(!Array.isArray(db.tests))db.tests=[];
-      db.tests.push({playerId:p.id,kit,rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"});
-      await writeDB(db);
-      return sendJSON(res,{ok:true,player:p,kit,elo,rank});
-    }
-
     // PLAYED database: every player who has joined/played on the ONYX server.
     if(u.pathname==="/api/players/played" && req.method==="GET"){
       const played=readPlayedDB();
@@ -455,6 +400,34 @@ const server = http.createServer(async(req,res)=>{
       await writePlayedDB(played);
       res.writeHead(200,{"Content-Type":"application/json"});
       return res.end(JSON.stringify(p));
+    }
+
+    // Minecraft OnyxPvP ingest: update a player's live ELO/tier directly from the server plugin.
+    if(u.pathname==="/api/pvp/match" && req.method==="POST"){
+      if(!ONYX_INGEST_TOKEN || String(req.headers["x-onyx-token"]||"") !== ONYX_INGEST_TOKEN)
+        return sendJSON(res,{error:"invalid ONYX token"},401);
+      const x=await body(req);
+      if(!x.name || !x.kit || x.elo==null || !x.tier) throw new Error("name, kit, elo and tier required");
+      const played=readPlayedDB();
+      const name=String(x.name).trim();
+      const uuid=String(x.uuid||"").replace(/-/g,"").toLowerCase();
+      let pp=played.players.find(v => (uuid && String(v.uuid||"").replace(/-/g,"").toLowerCase()===uuid) || String(v.name||"").toLowerCase()===name.toLowerCase());
+      if(!pp){
+        pp={id:Date.now().toString(36),name,uuid:x.uuid||"",region:x.region||"—",firstSeenAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),joins:0};
+        played.players.push(pp);
+      }else{pp.name=name;pp.uuid=x.uuid||pp.uuid;pp.lastSeenAt=new Date().toISOString();}
+      pp.pvpElo=pp.pvpElo||{}; pp.pvpTiers=pp.pvpTiers||{};
+      pp.pvpElo[String(x.kit)]=Number(x.elo); pp.pvpTiers[String(x.kit)]=String(x.tier);
+      await enrichSkin(pp); await writePlayedDB(played);
+      let p=db.players.find(v => (uuid && String(v.uuid||"").replace(/-/g,"").toLowerCase()===uuid) || String(v.name||"").toLowerCase()===name.toLowerCase());
+      if(!p){p={id:pp.uuid||("onyx_"+Date.now()),name:pp.name,uuid:pp.uuid||"",region:pp.region||"—",points:0,rankings:{},history:[]};db.players.push(p);}
+      p.name=pp.name;p.uuid=pp.uuid||p.uuid;p.region=pp.region||p.region;p.rankings=p.rankings||{};
+      const kit=String(x.kit); p.rankings[kit]={rank:String(x.tier),points:Number(x.elo),elo:Number(x.elo),updatedAt:new Date().toISOString(),source:"OnyxPvP"};
+      p.pvpElo=p.pvpElo||{};p.pvpTiers=p.pvpTiers||{};p.pvpElo[kit]=Number(x.elo);p.pvpTiers[kit]=String(x.tier);
+      p.points=Object.values(p.rankings).reduce((sum,v)=>sum+Number((v&&typeof v==='object'?v.points:v)||0),0);
+      p.history=p.history||[];p.history.unshift({date:new Date().toISOString(),kit,elo:Number(x.elo),rank:String(x.tier),source:"OnyxPvP"});if(p.history.length>100)p.history=p.history.slice(0,100);
+      await writeDB(db);
+      return sendJSON(res,{ok:true,name:p.name,kit,elo:Number(x.elo),tier:String(x.tier)});
     }
 
     // Tier-tested database: only players actually tested by ONYX appear in rankings.
