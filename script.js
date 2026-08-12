@@ -136,13 +136,21 @@ function filteredPlayers(){
     // Overall is an aggregate tier ranking, NOT raw ONYX points.
     // Give every ranked kit its tier value and total them, so a LT3
     // is correctly above an HT4 when they are otherwise comparable.
-    const overallScore = p => Object.values(p.rankings || {})
-      .reduce((sum, t) => sum + Math.max(0, tierValue(t)), 0);
+    const overallElo = p => Number.isFinite(Number(p.overallElo))
+      ? Number(p.overallElo)
+      : Number.isFinite(Number(p.points))
+        ? Number(p.points)
+        : 0;
+
+    const overallScore = p => {
+      if (p.overallTier) return tierValue(p.overallTier);
+      return Object.values(p.rankings || {})
+        .reduce((sum, t) => sum + Math.max(0, tierValue(typeof t==="object" ? (t.rank||t.tier||t.name) : t)), 0);
+    };
 
     data.sort((a,b)=>
+      overallElo(b) - overallElo(a) ||
       overallScore(b) - overallScore(a) ||
-      Math.max(...Object.values(b.rankings || {}).map(tierValue), -1) -
-      Math.max(...Object.values(a.rankings || {}).map(tierValue), -1) ||
       b.points-a.points
     );
   }
