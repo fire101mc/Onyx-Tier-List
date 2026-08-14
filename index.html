@@ -1,59 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>ONYX — Tier List</title><link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0f0d">
+  <title>ONYX Tier List</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body class="onyx-rankings-page">
-<header class="mct-nav">
-  <a class="onyx-wordmark" href="index.html"><img class="onyx-navbar-title" src="assets/onyx-navbar-title.png" alt="ONYX Tier List"></a>
-  <nav>
-    <a class="active" href="index.html?mode=overall">Rankings</a>
-    <a href="players.html">Players</a>
-    <a href="admin.html">Tier Testing</a>
-    <a href="mcpvp-reference.html">Reference</a>
-  </nav>
-  <div class="nav-search"><span>⌕</span><input id="searchInput" placeholder="Search player..."></div>
-</header>
+<body class="onyx-home">
+  <div class="site-background" aria-hidden="true"></div>
+  <div class="site-overlay" aria-hidden="true"></div>
 
-<main class="mct-main">
-<div class="mct-topline">
-    <div>
-      <div class="mct-kicker">ONYX — Tier List</div>
-      <h1 id="pageTitle">Overall</h1>
-      <p id="pageSubtitle">Players officially tier tested on the ONYX server.</p>
-    </div>
-    <div class="onyx-status" id="apiStatus"><i></i> Loading ONYX players…</div>
-  </div>
+  <header class="hero-nav">
+    <a class="brand" href="index.html" aria-label="ONYX Tier List home">
+      <img src="assets/onyx-logo.svg" alt="" class="brand-icon">
+      <span><b>ONYX</b><small>TIER LIST</small></span>
+    </a>
 
-  <div class="kit-tabs onyx-icon-tabs">
-    <a class="mode" data-mode="overall" href="index.html?mode=overall"><img src="assets/kits/overall.png" alt=""><span>Overall</span></a>
-    <a class="mode" data-mode="vanilla" href="index.html?mode=vanilla"><img src="assets/kits/vanilla.png" alt=""><span>Vanilla</span></a>
-    <a class="mode" data-mode="uhc" href="index.html?mode=uhc"><img src="assets/kits/uhc.png" alt=""><span>UHC</span></a>
-    <a class="mode" data-mode="pot" href="index.html?mode=pot"><img src="assets/kits/pot.png" alt=""><span>Pot</span></a>
-    <a class="mode" data-mode="nethop" href="index.html?mode=nethop"><img src="assets/kits/nethop.png" alt=""><span>NethOP</span></a>
-    <a class="mode" data-mode="smp" href="index.html?mode=smp"><img src="assets/kits/smp.png" alt=""><span>SMP</span></a>
-    <a class="mode" data-mode="sword" href="index.html?mode=sword"><img src="assets/kits/sword.png" alt=""><span>Sword</span></a>
-    <a class="mode" data-mode="axe" href="index.html?mode=axe"><img src="assets/kits/axe.png" alt=""><span>Axe</span></a>
-    <a class="mode" data-mode="mace" href="index.html?mode=mace"><img src="assets/kits/mace.png" alt=""><span>Mace</span></a>
-  </div>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a class="active" href="index.html">HOME</a>
+      <a href="#tiers">TIERS</a>
+      <a href="players.html">PLAYERS</a>
+      <a href="#players">LEADERBOARD</a>
+      <a href="#matches">MATCHES</a>
+      <a href="#about">ABOUT</a>
+    </nav>
 
-  <div class="rank-head">
-    <span>#</span><span>PLAYER</span><span>REGION</span><span>ONYX POINTS</span><span>RESULT</span>
-  </div>
-  <section id="playerList" class="rank-list"></section>
+    <a class="admin-button" href="admin.html"><span>♜</span> ADMIN</a>
+  </header>
 
-  <div class="onyx-empty-note">
-    <strong>ONYX is server-tested.</strong>
-    <span>MCPVP/MCTiers data is never used to place a player on this leaderboard.</span>
-  </div>
-</main>
+  <main>
+    <section class="hero-section">
+      <div class="hero-kicker">⚔ &nbsp; PVP TIER LIST</div>
+      <h1><span>ONYX</span><strong>TIER LIST</strong></h1>
+      <p class="hero-subtitle">Track your PvP progress, climb the ranks, and prove you're the best.</p>
+      <div class="hero-search">
+        <span>⌕</span>
+        <input id="searchInput" type="search" placeholder="Search player..." autocomplete="off">
+      </div>
+      <div class="database-status" id="apiStatus"><i></i> Loading ONYX players…</div>
+    </section>
 
-<script src="config.js"></script><script src="script.js"></script>
-<footer class="site-footer">
-  <div>© 2026 ONYX Tier List. All rights reserved.</div>
-  <div>Minecraft is a trademark of Mojang Studios and Microsoft. ONYX is an independent project and is not affiliated with or endorsed by Mojang Studios or Microsoft.</div>
-</footer>
-</body></html>
+    <section class="section-wrap" id="tiers">
+      <div class="section-label">TIERS</div>
+      <div class="tier-grid-home" id="tierCards">
+        <!-- Generated by script.js -->
+      </div>
+    </section>
+
+    <section class="stats-strip" aria-label="ONYX statistics">
+      <div><span class="stat-icon">♟</span><b id="statPlayers">0</b><small>Total Players</small></div>
+      <div><span class="stat-icon">⚔</span><b id="statTested">0</b><small>Tier Tested</small></div>
+      <div><span class="stat-icon">▥</span><b id="statRanked">0</b><small>Ranked Players</small></div>
+      <div><span class="stat-icon">★</span><b>10</b><small>Tiers</small></div>
+    </section>
+
+    <section class="players-section" id="players">
+      <div class="section-heading">
+        <div>
+          <div class="section-label left">RANKED PLAYERS</div>
+          <h2>ONYX Leaderboard</h2>
+          <p>Only players who have been tier tested on the ONYX server appear here.</p>
+        </div>
+        <a class="outline-button" href="players.html">VIEW ALL PLAYERS</a>
+      </div>
+      <div class="leaderboard" id="playerList"></div>
+    </section>
+
+    <section class="about-section" id="about">
+      <div>
+        <div class="section-label left">ABOUT ONYX</div>
+        <h2>Server-tested PvP rankings.</h2>
+      </div>
+      <p>ONYX is an independent Minecraft PvP tier-list project. Rankings shown here come from the ONYX server's own tier-testing database.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="matches">
+    <div>© 2026 ONYX Tier List. All rights reserved.</div>
+    <div>Minecraft is a trademark of Mojang Studios and Microsoft. ONYX is not affiliated with or endorsed by Mojang Studios or Microsoft.</div>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

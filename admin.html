@@ -1,82 +1,22 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ONYX — Admin</title>
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div class="shell">
-<header class="topbar">
-  <a class="brand" href="index.html">ONYX</a>
-  <span>ADMIN / DATABASE</span><button id="logoutBtn" style="margin-left:auto">Log out</button>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="theme-color" content="#080c09"><title>ONYX — Admin</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Russo+One&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body class="onyx-page admin-page"><header class="hero-nav site-nav">
+  <a class="brand" href="index.html" aria-label="ONYX Tier List home">
+    <img src="assets/onyx-logo.svg" alt="" class="brand-icon">
+    <span><b>ONYX</b><small>TIER LIST</small></span>
+  </a>
+  <nav class="main-nav" aria-label="Main navigation">
+    <a href="index.html">HOME</a>
+    <a href="index.html#tiers">TIERS</a>
+    <a href="players.html">PLAYERS</a>
+    <a href="index.html#players">LEADERBOARD</a>
+    <a href="index.html#matches">MATCHES</a>
+    <a href="index.html#about">ABOUT</a>
+  </nav>
+  <a class="admin-button" href="admin.html"><span>♜</span> ADMIN</a>
 </header>
-<main class="content">
-  <h1>ONYX Database Admin</h1>
-  <p class="muted">Manage the PLAYED database and ONYX tier-tested players. This page requires an authenticated admin session.</p>
-
-  <section class="card">
-    <h2>① Add player to PLAYED</h2>
-    <input id="name" placeholder="Minecraft username">
-    <input id="uuid" placeholder="UUID (optional)">
-    <input id="region" placeholder="Region, e.g. AS / EU / NA">
-    <button id="playedBtn">Add / update PLAYED</button>
-    <pre id="out"></pre>
-  </section>
-
-  <section class="card">
-    <h2>② Add player to ONYX tier database</h2>
-    <p class="muted">The player must already be in PLAYED. Enter their Minecraft username, UUID, or ONYX player ID.</p>
-    <input id="tierName" placeholder="Minecraft username">
-    <input id="tierUuid" placeholder="UUID (optional)">
-    <input id="tierRegion" placeholder="Region (optional)">
-    <button id="tierPlayerBtn">Create ONYX player</button>
-    <pre id="outTier"></pre>
-  </section>
-
-  <section class="card">
-    <h2>③ Record tier test</h2>
-    <input id="pid" placeholder="Minecraft username, UUID, or ONYX player ID">
-    <select id="kit">
-      <option value="sword">Sword</option><option value="axe">Axe</option>
-      <option value="pot">Pot</option><option value="nethop">NethOP</option>
-      <option value="smp">SMP</option><option value="uhc">UHC</option>
-      <option value="mace">Mace</option><option value="vanilla">Vanilla</option>
-    </select>
-    <input id="rank" placeholder="ONYX rank, e.g. HT2">
-    <input id="points" type="number" placeholder="Points">
-    <input id="tester" placeholder="Tester">
-    <textarea id="notes" placeholder="Notes"></textarea>
-    <button id="testBtn">Save tier test</button>
-    <pre id="out2"></pre>
-  </section>
-
-
-  <section class="card danger-card" id="remove-player-section">
-    <h2>④ Remove player</h2>
-    <p class="muted">Remove a player by username, UUID, or ONYX ID. Removing from ONYX also removes that player's saved tier-test records.</p>
-    <div class="admin-row">
-      <input id="removeIdentifier" placeholder="Minecraft username, UUID, or ONYX player ID">
-      <select id="removeDatabase">
-        <option value="played">PLAYED database</option>
-        <option value="onyx">ONYX tier database</option>
-        <option value="both">PLAYED + ONYX databases</option>
-      </select>
-      <button id="removeBtn" type="button">Remove player</button>
-    </div>
-    <pre id="removeOut"></pre>
-  </section>
-
-  <section class="card">
-    <h2>Connection</h2>
-    <p id="connection" class="muted">Checking backend…</p>
-  </section>
-</main>
-</div>
-
-<script src="config.js"></script>
-<script>
+<div class="site-background" aria-hidden="true"></div><div class="site-overlay" aria-hidden="true"></div><main class="admin-shell"><div class="admin-heading"><div><div class="eyebrow">ONYX CONTROL CENTER</div><h1>Admin Dashboard</h1><p>Manage the PLAYED database, ONYX players, and tier tests from one premium control panel.</p></div><button id="logoutBtn" class="outline-button">LOG OUT</button></div><div class="admin-grid"><section class="admin-card"><div class="card-number">01</div><h2>Add player to PLAYED</h2><p>The server activity database. Add or update a player record.</p><div class="form-grid"><label>USERNAME<input id="name" placeholder="Minecraft username"></label><label>UUID<input id="uuid" placeholder="UUID (optional)"></label><label>REGION<input id="region" placeholder="AS / EU / NA"></label></div><button id="playedBtn" class="gold-button">ADD / UPDATE PLAYED <span>→</span></button><pre id="out"></pre></section><section class="admin-card"><div class="card-number">02</div><h2>Create ONYX player</h2><p>Create the tier-list profile after the player exists in PLAYED.</p><div class="form-grid"><label>USERNAME<input id="tierName" placeholder="Minecraft username"></label><label>UUID<input id="tierUuid" placeholder="UUID (optional)"></label><label>REGION<input id="tierRegion" placeholder="Region (optional)"></label></div><button id="tierPlayerBtn" class="gold-button">CREATE ONYX PLAYER <span>→</span></button><pre id="outTier"></pre></section><section class="admin-card admin-card-wide"><div class="card-number">03</div><h2>Record tier test</h2><p>Save an official ONYX test result. No ELO is displayed on this interface.</p><div class="form-grid six"><label>PLAYER<input id="pid" placeholder="Username, UUID, or ONYX ID"></label><label>KIT<select id="kit"><option value="sword">Sword</option><option value="axe">Axe</option><option value="pot">Pot</option><option value="nethop">NethOP</option><option value="smp">SMP</option><option value="uhc">UHC</option><option value="mace">Mace</option><option value="vanilla">Vanilla</option></select></label><label>RANK<input id="rank" placeholder="HT2"></label><label>POINTS<input id="points" type="number" placeholder="Points"></label><label>TESTER<input id="tester" placeholder="Tester"></label><label class="full">NOTES<textarea id="notes" placeholder="Notes"></textarea></label></div><button id="testBtn" class="gold-button">SAVE TIER TEST <span>→</span></button><pre id="out2"></pre></section><section class="admin-card danger-card"><div class="card-number danger">04</div><h2>Remove player</h2><p>Remove a player from PLAYED, ONYX, or both databases. Saved ONYX tier-test records are removed with the ONYX profile.</p><div class="form-grid remove-grid"><label>PLAYER<input id="removeIdentifier" placeholder="Username, UUID, or ONYX ID"></label><label>DATABASE<select id="removeDatabase"><option value="played">PLAYED database</option><option value="onyx">ONYX tier database</option><option value="both">PLAYED + ONYX databases</option></select></label></div><button id="removeBtn" class="danger-button" type="button">REMOVE PLAYER</button><pre id="removeOut"></pre></section><section class="admin-card connection-card"><div class="card-number">05</div><h2>Connection</h2><p id="connection">Checking backend…</p><div class="connection-pulse"><i></i> LIVE BACKEND STATUS</div></section></div></main><footer class="site-footer themed-footer">
+  <div>© 2026 ONYX Tier List. All rights reserved.</div>
+  <div>Minecraft is a trademark of Mojang Studios and Microsoft. ONYX is an independent project and is not affiliated with or endorsed by Mojang Studios or Microsoft.</div>
+</footer><script src="config.js"></script><script>
 const cfg = window.ACE_CONFIG || {};
 // Admin is served by the ONYX backend, so API calls should stay on the same origin.
 // If you later host the frontend on GitHub Pages, put the backend URL in
@@ -192,10 +132,4 @@ document.getElementById("removeBtn").addEventListener("click", async()=>{
 
 document.getElementById("logoutBtn").onclick=async()=>{await fetch("/api/auth/logout",{method:"POST",credentials:"include"});location.href="/admin.html"};
 checkConnection();
-</script>
-<footer class="site-footer">
-  <div>© 2026 ONYX Tier List. All rights reserved.</div>
-  <div>Minecraft is a trademark of Mojang Studios and Microsoft. ONYX is an independent project and is not affiliated with or endorsed by Mojang Studios or Microsoft.</div>
-</footer>
-</body>
-</html>
+</script></body></html>

@@ -190,38 +190,6 @@ async function writePlayedDB(db){
   );
 }
 
-function calculateOverallElo(player){
-  const rankings = player?.rankings && typeof player.rankings==="object" ? player.rankings : {};
-  const values = Object.values(rankings)
-    .map(v => Number(v?.points))
-    .filter(v => Number.isFinite(v));
-  if(!values.length) return 0;
-  return Math.round(values.reduce((a,b)=>a+b,0) / values.length);
-}
-function refreshOverall(player){
-  if(!player) return player;
-  const overall = calculateOverallElo(player);
-  player.overallElo = overall;
-  // Keep legacy "points" for the existing frontend, but make it the
-  // average of the tested gamemode ELOs rather than their sum.
-  player.points = overall;
-  // A plugin can optionally provide an authoritative overall tier.
-  // Otherwise preserve the best available aggregate rank information.
-  if(!player.overallTier && player.rankings){
-    const ranks = Object.values(player.rankings)
-      .map(v => typeof v==="string" ? v : v?.rank)
-      .filter(Boolean);
-    const order = ["HT1","LT1","HT2","LT2","HT3","LT3","HT4","LT4","HT5","LT5","UNRANKED"];
-    ranks.sort((a,b)=>(order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)));
-    if(ranks.length) player.overallTier = ranks[0];
-  }
-  return player;
-}
-function refreshAllOverall(db){
-  for(const player of (db?.players||[])) refreshOverall(player);
-  return db;
-}
-
 async function initDatabase(){
   await pool.query(`
     CREATE TABLE IF NOT EXISTS onyx_store (
@@ -252,9 +220,6 @@ async function initDatabase(){
     }
     await writeDB(dbCache);
   }
-
-  refreshAllOverall(dbCache);
-  if(!onyxResult.rowCount) await writeDB(dbCache);
 
   if(playedResult.rowCount){
     playedCache = playedResult.rows[0].data || {players:[]};
@@ -417,11 +382,11 @@ const server = http.createServer(async(req,res)=>{
       p.uuid=playedPlayer.uuid||p.uuid;
       if(!p.rankings)p.rankings={};
       p.rankings[kit]={rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"};
-      refreshOverall(p);
+      p.points=Object.values(p.rankings).reduce((sum,v)=>sum+Number(v?.points||0),0);
       if(!Array.isArray(db.tests))db.tests=[];
       db.tests.push({playerId:p.id,kit,rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"});
       await writeDB(db);
-      return sendJSON(res,{ok:true,player:p,kit,elo,rank,overallElo:p.overallElo,overallTier:p.overallTier});
+      return sendJSON(res,{ok:true,player:p,kit,elo,rank});
     }
 
     // PLAYED database: every player who has joined/played on the ONYX server.
@@ -494,7 +459,6 @@ const server = http.createServer(async(req,res)=>{
 
     // Tier-tested database: only players actually tested by ONYX appear in rankings.
     if(u.pathname==="/api/onyx/players" && req.method==="GET"){
-      refreshAllOverall(db);
       const played=readPlayedDB();
       const playedByName=new Map(played.players.map(p=>[String(p.name||"").toLowerCase(),p]));
       for(const p of db.players){
@@ -590,7 +554,7 @@ const server = http.createServer(async(req,res)=>{
       if(!playedPlayer)throw new Error("Player is not in the PLAYED database.");
       if(!p.rankings)p.rankings={};
       p.rankings[x.kit]={rank:x.rank,points:Number(x.points||0),tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""};
-      refreshOverall(p);
+      p.points=Object.values(p.rankings).reduce((s,v)=>s+Number(v.points||0),0);
       db.tests.push({playerId:p.id,kit:x.kit,rank:x.rank,points:Number(x.points||0),tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""});
       await writeDB(db); res.writeHead(200,{"Content-Type":"application/json"}); return res.end(JSON.stringify(p));
     }

@@ -116,7 +116,3 @@ Your existing `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`, `ONYX_I
 ### Ranked PvP sync
 
 `POST /api/pvp/match` accepts `{name, uuid, kit, elo, rank}` with the same `X-Onyx-Token` ingest header used by the PLAYED sync. The endpoint maps `nethpot` → `nethop`, `diapot`/`pot` → `pot`, and writes the player's current PvP ELO/tier into the PostgreSQL-backed ONYX ranking record.
-
-
-## Overall ELO
-Overall ELO is calculated as the arithmetic mean of the player's tested gamemode ELO values. It is no longer the sum of all gamemode points. The backend exposes both `overallElo` and legacy `points` (which now equals the average).
