@@ -64,8 +64,23 @@ function tierClass(tier){return rawTier(tier).toLowerCase();}
 function escapeHtml(s){return String(s ?? "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));}
 function playerSkinUrl(p){
   if(!p?.uuid) return "";
-  return `https://mc-heads.net/player/${encodeURIComponent(p.uuid)}`;
+  return `https://mc-heads.net/avatar/${encodeURIComponent(p.uuid)}/100`;
 }
+function playerBodyUrl(p){
+  if(!p?.uuid) return "";
+  return `https://mc-heads.net/player/${encodeURIComponent(p.uuid)}/300`;
+}
+const KIT_META={
+  vanilla:{label:"Vanilla",short:"VANILLA",image:"assets/kits/vanilla.png"},
+  sword:{label:"Sword",short:"SWORD",image:"assets/kits/sword.png"},
+  axe:{label:"Axe",short:"AXE",image:"assets/kits/axe.png"},
+  pot:{label:"Pot",short:"POT",image:"assets/kits/pot.png"},
+  nethop:{label:"NethOP",short:"NETHOP",image:"assets/kits/nethop.png"},
+  smp:{label:"SMP",short:"SMP",image:"assets/kits/smp.png"},
+  uhc:{label:"UHC",short:"UHC",image:"assets/kits/uhc.png"},
+  mace:{label:"Mace",short:"MACE",image:"assets/kits/mace.png"}
+};
+const KIT_KEYS=Object.keys(KIT_META);
 
 function renderTierCards(){
   const target=document.getElementById("tierCards");
@@ -95,9 +110,9 @@ function renderHomePlayers(){
     <div class="leaderboard-head"><span>#</span><span>PLAYER</span><span>KIT RANKS</span><span>OVERALL</span></div>
     ${data.map((p,i)=>{
       const skin=playerSkinUrl(p);
-      const chips=["vanilla","sword","axe","pot","nethop","smp","uhc","mace"].map(k=>{
+      const chips=KIT_KEYS.map(k=>{
         const r=rawTier(p.rankings?.[k]);
-        return `<span class="leader-chip">${escapeHtml(MODES[k].label.slice(0,3))}<b>${escapeHtml(r||"—")}</b></span>`;
+        return `<span class="leader-chip"><img src="${KIT_META[k].image}" alt="" loading="lazy"><em>${escapeHtml(KIT_META[k].short)}</em><b>${escapeHtml(r||"—")}</b></span>`;
       }).join("");
       return `<div class="leader-row">
         <div class="leader-rank">${i+1}</div>
@@ -140,6 +155,7 @@ async function loadMcpvpData(){
   renderPage();
   await renderPlayersPage();
   renderProfile();
+  await renderKitsPage();
 }
 
 async function renderPlayersPage(){
@@ -159,7 +175,7 @@ async function renderPlayersPage(){
       const t=testedMap.get(String(p.name).toLowerCase());
       return `<div class="player-row">
         <div class="rank">${i+1}</div>
-        <div class="player"><div class="avatar"></div><a class="player-link" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a></div>
+        <div class="player"><div class="avatar">${playerSkinUrl(p)?`<img src="${playerSkinUrl(p)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:""}</div><a class="player-link" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a></div>
         <div>${escapeHtml(p.region||"—")}</div>
         <div class="tier-badge ${tierClass(highestTier(t))}">${escapeHtml(highestTier(t)||"—")}</div>
         <div>${t?"Tier tested":"Played"}</div>
@@ -178,8 +194,45 @@ function renderProfile(){
   const name=new URLSearchParams(location.search).get("name")||"";
   const p=players.find(x=>String(x.name).toLowerCase()===name.toLowerCase());
   if(!p){root.innerHTML=`<div class="empty-onyx">Player not found in the ONYX tier database.</div>`;return;}
-  const kits=["vanilla","sword","axe","pot","nethop","smp","uhc","mace"];
-  root.innerHTML=`<div class="profile-section"><div class="eyebrow">ONYX PLAYER</div><h1>${escapeHtml(p.name)}</h1><p>Overall tier: <b>${escapeHtml(highestTier(p)||"—")}</b></p><div class="kit-grid">${kits.map(k=>`<div class="kit-rank"><span>${escapeHtml(MODES[k].label)}</span><b class="tier-badge ${tierClass(rawTier(p.rankings?.[k]))}">${escapeHtml(rawTier(p.rankings?.[k])||"—")}</b></div>`).join("")}</div></div>`;
+  const body=playerBodyUrl(p);
+  const tested=KIT_KEYS.filter(k=>rawTier(p.rankings?.[k]));
+  root.innerHTML=`
+    <div class="profile-hero-card">
+      <div class="profile-skin-panel">${body?`<img class="profile-full-skin" src="${body}" alt="${escapeHtml(p.name)} full Minecraft skin" loading="eager" referrerpolicy="no-referrer">`:`<div class="skin-placeholder">SKIN<br><small>UUID unavailable</small></div>`}</div>
+      <div class="profile-info">
+        <div class="eyebrow">ONYX PLAYER PROFILE</div>
+        <h1>${escapeHtml(p.name)}</h1>
+        <div class="profile-meta"><span>${escapeHtml(p.region||"—")}</span><span>${tested.length} KIT${tested.length===1?"":"S"} TESTED</span></div>
+        <div class="profile-overall"><small>HIGHEST TESTED TIER</small><b>${escapeHtml(highestTier(p)||"—")}</b></div>
+      </div>
+    </div>
+    <section class="profile-kits-section">
+      <div class="section-label left">TESTED KITS</div>
+      <h2>${tested.length ? "Kit results" : "No kit tests yet"}</h2>
+      <p class="profile-muted">Only official ONYX tier tests recorded for this player are shown.</p>
+      <div class="profile-kit-grid">${KIT_KEYS.map(k=>{
+        const r=rawTier(p.rankings?.[k]); const test=p.rankings?.[k]||{};
+        return `<article class="profile-kit-card ${r?"tested":"untested"}">
+          <div class="profile-kit-art"><img src="${KIT_META[k].image}" alt="${escapeHtml(KIT_META[k].label)}" loading="lazy"></div>
+          <div class="profile-kit-name">${escapeHtml(KIT_META[k].label)}</div>
+          <div class="profile-kit-tier ${tierClass(r)}">${escapeHtml(r||"NOT TESTED")}</div>
+          ${r?`<div class="profile-kit-detail">Tested by ${escapeHtml(test.tester||"ONYX")}</div>`:`<div class="profile-kit-detail">No result recorded</div>`}
+        </article>`;
+      }).join("")}</div>
+    </section>`;
+}
+
+async function renderKitsPage(){
+  const root=document.getElementById("kitsRoot");
+  if(!root) return;
+  const tested=players;
+  root.innerHTML=KIT_KEYS.map(k=>{
+    const rows=tested.filter(p=>rawTier(p.rankings?.[k])).sort((a,b)=>tierScore(rawTier(b.rankings?.[k]))-tierScore(rawTier(a.rankings?.[k]))||String(a.name).localeCompare(String(b.name)));
+    return `<section class="kit-directory-card">
+      <div class="kit-directory-header"><div class="kit-directory-icon"><img src="${KIT_META[k].image}" alt="" loading="lazy"></div><div><div class="eyebrow">KIT</div><h2>${escapeHtml(KIT_META[k].label)}</h2><p>${rows.length} tested player${rows.length===1?"":"s"}</p></div></div>
+      <div class="kit-player-list">${rows.length?rows.map((p,i)=>`<a class="kit-player-row" href="player.html?name=${encodeURIComponent(p.name)}"><span class="kit-place">${String(i+1).padStart(2,"0")}</span><span class="kit-player-avatar">${playerSkinUrl(p)?`<img src="${playerSkinUrl(p)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:""}</span><span class="kit-player-name">${escapeHtml(p.name)}<small>${escapeHtml(p.region||"—")}</small></span><b class="tier-badge ${tierClass(rawTier(p.rankings?.[k]))}">${escapeHtml(rawTier(p.rankings?.[k]))}</b></a>`).join(""):`<div class="empty-kit">No players tested in this kit yet.</div>`}</div>
+    </section>`;
+  }).join("");
 }
 
 async function loadExternalDatabase(){
