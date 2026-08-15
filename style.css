@@ -404,3 +404,72 @@ a{color:inherit}
   .mode-player-main .leader-skin{width:34px;height:42px}
   .mode-player-main .leader-skin img{width:31px;height:38px}
 }
+
+
+/* Horizontal MCTiers-style tier navigation, kept in ONYX styling */
+.tier-tabs-wrap{
+  width:100%;
+  overflow-x:auto;
+  margin:10px 0 18px;
+  scrollbar-width:thin;
+}
+.tier-tabs{
+  display:flex;
+  align-items:stretch;
+  gap:7px;
+  min-width:max-content;
+  padding:6px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:12px;
+  background:rgba(5,8,7,.78);
+  backdrop-filter:blur(14px);
+}
+.tier-tab{
+  min-width:76px;
+  height:54px;
+  padding:7px 12px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:rgba(255,255,255,.025);
+  color:#d7d9d2;
+  cursor:pointer;
+  transition:transform .15s ease,filter .15s ease,background .15s ease,border-color .15s ease;
+}
+.tier-tab strong{
+  font:900 10px Inter,sans-serif;
+  letter-spacing:.05em;
+}
+.tier-tab span{
+  font:900 16px Inter,sans-serif;
+  line-height:15px;
+}
+.tier-tab em{
+  font:700 8px Inter,sans-serif;
+  color:#777d76;
+  font-style:normal;
+}
+.tier-tab:hover{
+  transform:translateY(-2px);
+  filter:brightness(1.15);
+  border-color:rgba(247,201,87,.32);
+}
+.tier-tab[aria-selected="true"]{
+  background:rgba(247,201,87,.12);
+  border-color:rgba(247,201,87,.55);
+  box-shadow:0 0 18px rgba(247,201,87,.08);
+  color:#f7c957;
+}
+.tier-ht1,.tier-lt1{background:linear-gradient(180deg,rgba(255,180,60,.12),rgba(255,180,60,.035))}
+.tier-ht2,.tier-lt2{background:linear-gradient(180deg,rgba(178,120,255,.10),rgba(178,120,255,.025))}
+.tier-ht3,.tier-lt3{background:linear-gradient(180deg,rgba(255,92,92,.10),rgba(255,92,92,.025))}
+.tier-ht4,.tier-lt4{background:linear-gradient(180deg,rgba(255,151,71,.09),rgba(255,151,71,.02))}
+.tier-ht5,.tier-lt5{background:linear-gradient(180deg,rgba(150,150,150,.08),rgba(150,150,150,.018))}
+@media(max-width:800px){
+  .tier-tab{min-width:65px;height:49px;padding:5px 9px}
+  .tier-tab span{font-size:14px}
+}

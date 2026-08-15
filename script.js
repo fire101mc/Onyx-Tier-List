@@ -23,6 +23,7 @@ const TIER_LABELS = {
 let players = [];
 let activeRegion = "all";
 let activeMode = "overall";
+let activeTier = null;
 
 function normalizeApiPayload(payload){
   if(typeof payload === "string"){
@@ -160,6 +161,7 @@ function renderGamemodeTabs(){
   target.querySelectorAll(".gamemode-tab").forEach(btn => {
     btn.addEventListener("click", () => {
       activeMode = btn.dataset.mode || "overall";
+      activeTier = null;
       renderGamemodeTabs();
       renderHomePlayers();
     });
@@ -193,6 +195,31 @@ function modeRankChip(player, key){
 function highestTierForMode(player, mode){
   return rawTier(player?.rankings?.[mode]);
 }
+
+function renderTierTabsForMode(mode, data){
+  if(mode === "overall") return "";
+
+  const tiers = ["HT1","LT1","HT2","LT2","HT3","LT3","HT4","LT4","HT5","LT5"];
+  const counts = Object.fromEntries(tiers.map(t => [t, 0]));
+  data.forEach(p => {
+    const t = rawTier(p?.rankings?.[mode]);
+    if(counts[t] !== undefined) counts[t]++;
+  });
+
+  return `
+    <div class="tier-tabs-wrap">
+      <div class="tier-tabs" role="tablist" aria-label="${escapeHtml(MODES[mode].label)} tiers">
+        ${tiers.map(t => `
+          <button class="tier-tab tier-${t.toLowerCase()}" type="button"
+            data-tier="${t}" aria-selected="false">
+            <strong>${t.startsWith("H") ? "HT" : "LT"}</strong>
+            <span>${t.slice(2)}</span>
+            <em>${counts[t]}</em>
+          </button>`).join("")}
+      </div>
+    </div>`;
+}
+
 function renderHomePlayers(){
   const list = document.getElementById("playerList");
   if(!list) return;
@@ -204,133 +231,83 @@ function renderHomePlayers(){
 
   if(q) data = data.filter(p => String(p.name || "").toLowerCase().includes(q));
 
-  if(activeMode !== "overall"){
-    // MCTiers-inspired organization: players are grouped into Tier 1 -> Tier 5.
-    // Each tier contains LT/HT variants, with the player's exact tier shown beside them.
-    const tierGroups = [
-      {num:1, high:"HT1", low:"LT1"},
-      {num:2, high:"HT2", low:"LT2"},
-      {num:3, high:"HT3", low:"LT3"},
-      {num:4, high:"HT4", low:"LT4"},
-      {num:5, high:"HT5", low:"LT5"}
-    ];
+  if(activeMode === "overall"){
+    activeTier = null;
+  } else if(activeTier){
+    data = data.filter(p => rawTier(p?.rankings?.[activeMode]) === activeTier);
+  }
 
-    const grouped = tierGroups.map(group => {
-      const members = data
-        .filter(p => {
-          const tier = rawTier(p?.rankings?.[activeMode]);
-          return tier === group.high || tier === group.low;
-        })
-        .sort((a,b) =>
-          tierScore(highestTierForMode(b, activeMode)) - tierScore(highestTierForMode(a, activeMode)) ||
-          String(a.name).localeCompare(String(b.name))
-        );
-      return {...group, members};
-    });
+  const baseData = players
+    .filter(p => activeRegion === "all" || p.region === activeRegion)
+    .filter(p => !q || String(p.name || "").toLowerCase().includes(q))
+    .filter(p => activeMode === "overall" ? highestTier(p) : rawTier(p?.rankings?.[activeMode]));
 
-    if(!grouped.some(g => g.members.length)){
-      list.innerHTML = `<div class="empty-onyx">No ONYX-tested players in this gamemode yet.</div>`;
-      return;
-    }
+  data = data.sort((a,b) =>
+    playerModeScore(b, activeMode) - playerModeScore(a, activeMode) ||
+    String(a.name).localeCompare(String(b.name))
+  );
 
-    list.innerHTML = grouped.filter(g => g.members.length).map(group => {
-      const modeMeta = KIT_META[activeMode];
-      const rows = group.members.map((p, i) => {
-        const tier = rawTier(p?.rankings?.[activeMode]);
-        const points = rankingPoints(p?.rankings?.[activeMode]);
-        const skin = playerSkinUrl(p);
-        const tierClassName = tier.toLowerCase();
+  const tierBar = renderTierTabsForMode(activeMode, baseData);
 
-        return `
-          <div class="mode-player-row">
-            <div class="mode-player-pos">${i + 1}</div>
-            <div class="mode-player-main">
-              <div class="leader-skin">
-                ${skin ? `<img src="${skin}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
-              </div>
-              <div class="mode-player-name-wrap">
-                <a class="leader-name" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a>
-                <div class="leader-region"><i></i>${escapeHtml(p.region || "—")}</div>
-              </div>
-            </div>
-            <div class="mode-tier-badge tier-badge-${tierClassName}" title="${escapeHtml(modeMeta.label)} • ${points} point${points === 1 ? "" : "s"}">
-              <img src="${modeMeta.image}" alt="" loading="lazy">
-              <strong>${escapeHtml(tier)}</strong>
-            </div>
-            <div class="mode-points">${points}<span>POINT${points === 1 ? "" : "S"}</span></div>
-          </div>`;
-      }).join("");
-
-      return `
-        <section class="mode-tier-section">
-          <div class="mode-tier-heading">
-            <div>
-              <span class="mode-tier-kicker">ONYX RANKINGS</span>
-              <h3>Tier ${group.num}</h3>
-            </div>
-            <div class="mode-tier-variants">
-              <span class="variant-pill variant-lt">LT${group.num}</span>
-              <span class="variant-pill variant-ht">HT${group.num}</span>
-            </div>
-          </div>
-          <div class="mode-tier-table">
-            <div class="mode-tier-table-head">
-              <span>#</span><span>PLAYER</span><span>TIER</span><span>POINTS</span>
-            </div>
-            ${rows}
-          </div>
-        </section>`;
-    }).join("");
-
+  if(!data.length){
+    list.innerHTML = tierBar + `<div class="empty-onyx">No ONYX-tested players in this tier yet.</div>`;
+    bindTierTabs();
     return;
   }
 
-  // Overall keeps the ONYX leaderboard style and shows every tested kit.
-  data = data
-    .filter(p => highestTier(p))
-    .sort((a,b) =>
-      playerModeScore(b, activeMode) - playerModeScore(a, activeMode) ||
-      String(a.name).localeCompare(String(b.name))
-    );
+  const headerMode = activeMode === "overall" ? "KIT RANKS" : `${MODES[activeMode].label.toUpperCase()} RANK`;
 
-  const shown = data.slice(0, 12);
+  const rows = data.map((p,i) => {
+    const skin = playerSkinUrl(p);
+    const chips = activeMode === "overall"
+      ? KIT_KEYS.map(k => p.rankings?.[k] ? modeRankChip(p,k) : "").filter(Boolean).join("")
+      : modeRankChip(p, activeMode);
 
-  if(!shown.length){
-    list.innerHTML = `<div class="empty-onyx">No ONYX-tested players yet.</div>`;
-    return;
-  }
+    const selectedTier = activeMode === "overall"
+      ? highestTier(p)
+      : rawTier(p?.rankings?.[activeMode]);
 
-  const headerMode = "KIT RANKS";
+    const selectedPoints = activeMode === "overall"
+      ? Number(p.points || 0)
+      : Number(p?.rankings?.[activeMode]?.points ?? tierPointsFor(selectedTier));
 
-  list.innerHTML = `
+    return `
+      <div class="leader-row">
+        <div class="leader-rank">${i+1}</div>
+        <div class="leader-player">
+          <div class="leader-skin">${skin ? `<img src="${skin}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</div>
+          <div>
+            <a class="leader-name" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a>
+            <div class="leader-region"><i></i>${escapeHtml(p.region || "—")}</div>
+          </div>
+        </div>
+        <div class="leader-kits">${chips || `<span class="untested-chip">UNTESTED</span>`}</div>
+        <div class="leader-overall">
+          <b>${escapeHtml(selectedTier || "—")}</b>
+          <small>${selectedPoints} point${selectedPoints === 1 ? "" : "s"}</small>
+        </div>
+      </div>`;
+  }).join("");
+
+  list.innerHTML = tierBar + `
     <div class="leaderboard-head">
       <span>#</span><span>PLAYER</span><span>${headerMode}</span><span>POINTS</span>
     </div>
-    ${shown.map((p,i) => {
-      const rankNumber = competitionRank(shown, i, activeMode);
-      const skin = playerSkinUrl(p);
-      const chips = KIT_KEYS.map(k => p.rankings?.[k] ? modeRankChip(p,k) : "").filter(Boolean).join("");
-      const selectedTier = highestTier(p);
-      const selectedPoints = overallPoints(p);
+    ${rows}`;
 
-      return `
-        <div class="leader-row">
-          <div class="leader-rank">${rankNumber}</div>
-          <div class="leader-player">
-            <div class="leader-skin">${skin ? `<img src="${skin}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</div>
-            <div>
-              <a class="leader-name" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a>
-              <div class="leader-region"><i></i>${escapeHtml(p.region || "—")}</div>
-            </div>
-          </div>
-          <div class="leader-kits">${chips || `<span class="untested-chip">UNTESTED</span>`}</div>
-          <div class="leader-overall">
-            <b>${escapeHtml(selectedTier || "—")}</b>
-            <small>${selectedPoints} point${selectedPoints === 1 ? "" : "s"}</small>
-          </div>
-        </div>`;
-    }).join("")}`;
+  bindTierTabs();
 }
+
+function bindTierTabs(){
+  document.querySelectorAll(".tier-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tier = btn.dataset.tier;
+      activeTier = activeTier === tier ? null : tier;
+      renderHomePlayers();
+    });
+  });
+}
+
 function renderStats(){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v)};
   set("statPlayers",players.length);
