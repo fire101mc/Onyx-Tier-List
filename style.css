@@ -179,3 +179,84 @@ a{color:inherit}
 @media(max-width:620px){.profile-hero-card{grid-template-columns:1fr}.profile-skin-panel{min-height:330px;border-right:0;border-bottom:1px solid rgba(255,255,255,.08)}.profile-info{padding:28px}.profile-info h1{font-size:40px!important}.profile-kit-grid{grid-template-columns:1fr 1fr}.kit-directory-header{padding:17px}.kit-player-row{grid-template-columns:28px 34px 1fr auto}}
 
 .field-hint{display:block;margin-top:6px;color:rgba(255,255,255,.48);font-size:11px;letter-spacing:.04em}
+
+
+/* ONYX premium gamemode tabs */
+.gamemode-tabs-wrap{margin:18px 0 12px;overflow-x:auto;scrollbar-width:thin}
+.gamemode-tabs{display:flex;gap:8px;min-width:max-content;padding:5px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(7,10,8,.72);backdrop-filter:blur(14px);box-shadow:0 12px 30px rgba(0,0,0,.18)}
+.gamemode-tab{appearance:none;border:1px solid transparent;border-radius:9px;background:transparent;color:#8f978f;min-height:42px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font:800 10px Inter,sans-serif;letter-spacing:.08em;text-transform:uppercase;transition:transform .16s ease,background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease}
+.gamemode-tab img{width:23px;height:23px;object-fit:contain}
+.gamemode-tab:hover{color:#f4f0df;background:rgba(255,255,255,.045);transform:translateY(-1px)}
+.gamemode-tab.active{color:#f7c957;border-color:rgba(247,201,87,.45);background:linear-gradient(180deg,rgba(247,201,87,.13),rgba(247,201,87,.045));box-shadow:0 0 22px rgba(247,201,87,.08),inset 0 0 0 1px rgba(247,201,87,.05)}
+.gamemode-tab.active img{filter:drop-shadow(0 0 6px rgba(247,201,87,.35))}
+.leader-chip-hover{position:relative;cursor:help}
+.leader-chip-hover::after{content:attr(data-tooltip);position:absolute;z-index:50;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%) translateY(4px);opacity:0;pointer-events:none;white-space:nowrap;padding:8px 10px;border:1px solid rgba(247,201,87,.35);border-radius:8px;background:rgba(7,9,8,.97);color:#f7c957;box-shadow:0 12px 28px rgba(0,0,0,.45);font:800 10px Inter,sans-serif;letter-spacing:.04em;transition:opacity .14s ease,transform .14s ease}
+.leader-chip-hover::before{content:"";position:absolute;z-index:51;left:50%;bottom:calc(100% + 4px);width:7px;height:7px;transform:translateX(-50%) rotate(45deg) translateY(4px);opacity:0;pointer-events:none;background:rgba(7,9,8,.97);border-right:1px solid rgba(247,201,87,.35);border-bottom:1px solid rgba(247,201,87,.35);transition:opacity .14s ease,transform .14s ease}
+.leader-chip-hover:hover::after,.leader-chip-hover:hover::before{opacity:1}
+.leader-chip-hover:hover::after{transform:translateX(-50%) translateY(0)}
+.leader-chip-hover:hover::before{transform:translateX(-50%) rotate(45deg) translateY(0)}
+@media(max-width:800px){.gamemode-tabs{gap:5px}.gamemode-tab{padding:0 10px;min-height:38px}.gamemode-tab img{width:20px;height:20px}.gamemode-tab span{font-size:9px}}
+
+
+/* =========================================================
+   PLAYERS PAGE FIX — contained full-body skins
+   ========================================================= */
+.premium-table .player-row{min-height:82px;height:82px}
+.premium-table .player{
+  min-width:0;
+  height:100%;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  overflow:visible;
+}
+.premium-table .avatar{
+  flex:0 0 54px;
+  width:54px;
+  height:68px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:8px;
+  background:linear-gradient(180deg,rgba(31,42,35,.75),rgba(8,13,10,.92));
+  box-shadow:inset 0 0 18px rgba(0,0,0,.25);
+}
+.premium-table .avatar img{
+  display:block;
+  width:auto;
+  height:64px;
+  max-width:48px;
+  object-fit:contain;
+  object-position:center bottom;
+  image-rendering:pixelated;
+}
+.premium-table .avatar-full img{
+  width:auto;
+  height:68px;
+  max-width:50px;
+}
+.premium-table .player-link{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.brand-icon{
+  display:block;
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+  object-fit:contain;
+}
+.brand-icon[src$=".png"]{
+  image-rendering:auto;
+}
+@media(max-width:620px){
+  .premium-table .table-head,.premium-table .player-row{min-width:850px}
+  .premium-table .player-row{height:78px;min-height:78px}
+  .premium-table .avatar{flex-basis:50px;width:50px;height:64px}
+  .premium-table .avatar-full img{height:62px;max-width:47px}
+}

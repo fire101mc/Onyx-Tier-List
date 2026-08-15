@@ -22,6 +22,7 @@ const TIER_LABELS = {
 
 let players = [];
 let activeRegion = "all";
+let activeMode = "overall";
 
 function normalizeApiPayload(payload){
   if(typeof payload === "string"){
@@ -101,31 +102,127 @@ function filteredPlayers(){
   return data.filter(p=>highestTier(p)).sort((a,b)=>tierScore(highestTier(b))-tierScore(highestTier(a)) || String(a.name).localeCompare(String(b.name)));
 }
 
-function renderHomePlayers(){
-  const list=document.getElementById("playerList");
-  if(!list) return;
-  const data=filteredPlayers().slice(0,12);
-  if(!data.length){list.innerHTML=`<div class="empty-onyx">No ONYX-tested players yet.</div>`;return;}
-  list.innerHTML=`
-    <div class="leaderboard-head"><span>#</span><span>PLAYER</span><span>KIT RANKS</span><span>OVERALL</span></div>
-    ${data.map((p,i)=>{
-      const skin=playerSkinUrl(p);
-      const chips=KIT_KEYS.map(k=>{
-        const r=rawTier(p.rankings?.[k]);
-        return `<span class="leader-chip"><img src="${KIT_META[k].image}" alt="" loading="lazy"><em>${escapeHtml(KIT_META[k].short)}</em><b>${escapeHtml(r||"—")}</b></span>`;
-      }).join("");
-      return `<div class="leader-row">
-        <div class="leader-rank">${i+1}</div>
-        <div class="leader-player">
-          <div class="leader-skin">${skin?`<img src="${skin}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}</div>
-          <div><a class="leader-name" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a><div class="leader-region"><i></i>${escapeHtml(p.region||"—")}</div></div>
-        </div>
-        <div class="leader-kits">${chips}</div>
-        <div class="leader-overall"><b>${escapeHtml(highestTier(p))}</b><small>overall tier</small></div>
-      </div>`;
-    }).join("")}`;
+function tierPointsFor(tier){
+  const points = {LT5:1,HT5:2,LT4:3,HT4:4,LT3:6,HT3:10,LT2:15,HT2:30,LT1:45,HT1:60};
+  return points[rawTier(tier)] ?? 0;
 }
 
+function rankingForMode(player, mode){
+  if(mode === "overall") return null;
+  return player?.rankings?.[mode] ?? null;
+}
+
+function renderGamemodeTabs(){
+  const target = document.getElementById("gamemodeTabs");
+  if(!target) return;
+
+  const order = ["overall","vanilla","uhc","pot","nethop","smp","sword","axe","mace"];
+  target.innerHTML = order.map(key => {
+    const mode = MODES[key];
+    const image = KIT_META[key]?.image || "assets/kits/overall.png";
+    const active = activeMode === key;
+    return `
+      <button class="gamemode-tab${active ? " active" : ""}" type="button" role="tab"
+        aria-selected="${active}" data-mode="${key}">
+        <img src="${image}" alt="" loading="lazy">
+        <span>${escapeHtml(mode.label)}</span>
+      </button>`;
+  }).join("");
+
+  target.querySelectorAll(".gamemode-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeMode = btn.dataset.mode || "overall";
+      renderGamemodeTabs();
+      renderHomePlayers();
+    });
+  });
+}
+
+function playerModeScore(player, mode){
+  if(mode === "overall") return tierScore(highestTier(player));
+  return tierScore(rawTier(player?.rankings?.[mode]));
+}
+
+function modeRankChip(player, key){
+  const ranking = rankingForMode(player, key);
+  const tier = rawTier(ranking);
+  const points = Number(ranking?.points ?? tierPointsFor(tier));
+  const meta = KIT_META[key];
+  if(!meta) return "";
+
+  return `
+    <span class="leader-chip leader-chip-hover"
+      data-tooltip="${escapeHtml(meta.label)} • ${points} point${points === 1 ? "" : "s"}"
+      aria-label="${escapeHtml(meta.label)} ${escapeHtml(tier || "untested")}, ${points} point${points === 1 ? "" : "s"}">
+      <img src="${meta.image}" alt="" loading="lazy">
+      <em>${escapeHtml(meta.short)}</em>
+      <b>${escapeHtml(tier || "—")}</b>
+    </span>`;
+}
+
+function renderHomePlayers(){
+  const list = document.getElementById("playerList");
+  if(!list) return;
+
+  renderGamemodeTabs();
+
+  const q = (document.getElementById("searchInput")?.value || "").toLowerCase().trim();
+  let data = players.filter(p => activeRegion === "all" || p.region === activeRegion);
+
+  if(q) data = data.filter(p => String(p.name || "").toLowerCase().includes(q));
+
+  data = data
+    .filter(p => activeMode === "overall" ? highestTier(p) : rawTier(p?.rankings?.[activeMode]))
+    .sort((a,b) =>
+      playerModeScore(b, activeMode) - playerModeScore(a, activeMode) ||
+      String(a.name).localeCompare(String(b.name))
+    );
+
+  const shown = data.slice(0, 12);
+
+  if(!shown.length){
+    list.innerHTML = `<div class="empty-onyx">No ONYX-tested players in this gamemode yet.</div>`;
+    return;
+  }
+
+  const headerMode = activeMode === "overall" ? "KIT RANKS" : `${MODES[activeMode].label.toUpperCase()} RANK`;
+
+  list.innerHTML = `
+    <div class="leaderboard-head">
+      <span>#</span><span>PLAYER</span><span>${headerMode}</span><span>POINTS</span>
+    </div>
+    ${shown.map((p,i) => {
+      const skin = playerSkinUrl(p);
+      const chips = activeMode === "overall"
+        ? KIT_KEYS.map(k => p.rankings?.[k] ? modeRankChip(p,k) : "").filter(Boolean).join("")
+        : modeRankChip(p, activeMode);
+
+      const selectedTier = activeMode === "overall"
+        ? highestTier(p)
+        : rawTier(p?.rankings?.[activeMode]);
+
+      const selectedPoints = activeMode === "overall"
+        ? Number(p.points || 0)
+        : Number(p?.rankings?.[activeMode]?.points ?? tierPointsFor(selectedTier));
+
+      return `
+        <div class="leader-row">
+          <div class="leader-rank">${i+1}</div>
+          <div class="leader-player">
+            <div class="leader-skin">${skin ? `<img src="${skin}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</div>
+            <div>
+              <a class="leader-name" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a>
+              <div class="leader-region"><i></i>${escapeHtml(p.region || "—")}</div>
+            </div>
+          </div>
+          <div class="leader-kits">${chips || `<span class="untested-chip">UNTESTED</span>`}</div>
+          <div class="leader-overall">
+            <b>${escapeHtml(selectedTier || "—")}</b>
+            <small>${selectedPoints} point${selectedPoints === 1 ? "" : "s"}</small>
+          </div>
+        </div>`;
+    }).join("")}`;
+}
 function renderStats(){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v)};
   set("statPlayers",players.length);
@@ -175,7 +272,7 @@ async function renderPlayersPage(){
       const t=testedMap.get(String(p.name).toLowerCase());
       return `<div class="player-row">
         <div class="rank">${i+1}</div>
-        <div class="player"><div class="avatar">${playerSkinUrl(p)?`<img src="${playerSkinUrl(p)}" alt="" loading="lazy" referrerpolicy="no-referrer">`:""}</div><a class="player-link" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a></div>
+        <div class="player"><div class="avatar avatar-full">${playerBodyUrl(p)?`<img src="${playerBodyUrl(p)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=playerSkinUrl(p)">`:""}</div><a class="player-link" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a></div>
         <div>${escapeHtml(p.region||"—")}</div>
         <div class="tier-badge ${tierClass(highestTier(t))}">${escapeHtml(highestTier(t)||"—")}</div>
         <div>${t?"Tier tested":"Played"}</div>
