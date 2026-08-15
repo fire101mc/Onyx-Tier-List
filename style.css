@@ -178,6 +178,4 @@ a{color:inherit}
 @media(max-width:900px){.profile-hero-card{grid-template-columns:230px 1fr}.profile-skin-panel{min-height:340px}.profile-full-skin{height:310px;max-width:190px}.profile-info{padding:35px}.profile-kit-grid{grid-template-columns:repeat(2,1fr)}.kits-directory{grid-template-columns:1fr}}
 @media(max-width:620px){.profile-hero-card{grid-template-columns:1fr}.profile-skin-panel{min-height:330px;border-right:0;border-bottom:1px solid rgba(255,255,255,.08)}.profile-info{padding:28px}.profile-info h1{font-size:40px!important}.profile-kit-grid{grid-template-columns:1fr 1fr}.kit-directory-header{padding:17px}.kit-player-row{grid-template-columns:28px 34px 1fr auto}}
 
-/* ONYX brand logo — served from /assets so it works from every Render route. */
-.brand-icon{display:block;width:42px;height:42px;flex:0 0 42px;object-fit:contain;object-position:center;image-rendering:auto}
-@media (max-width:760px){.brand-icon{width:34px;height:34px;flex-basis:34px}.brand{gap:7px}}
+.field-hint{display:block;margin-top:6px;color:rgba(255,255,255,.48);font-size:11px;letter-spacing:.04em}

@@ -49,6 +49,26 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "";
 const sessions = new Map();
 
+// ONYX tier points: the official points awarded by each tier.
+// These are server-authoritative so every page/API uses the same values.
+const TIER_POINTS = Object.freeze({
+  LT5: 1,
+  HT5: 2,
+  LT4: 3,
+  HT4: 4,
+  LT3: 6,
+  HT3: 10,
+  LT2: 15,
+  HT2: 30,
+  LT1: 45,
+  HT1: 60
+});
+function normalizeTier(value){ return String(value||"").trim().toUpperCase(); }
+function pointsForTier(tier){
+  const key=normalizeTier(tier);
+  return Object.prototype.hasOwnProperty.call(TIER_POINTS,key) ? TIER_POINTS[key] : 0;
+}
+
 function hashSession(token){ return crypto.createHmac("sha256",SESSION_SECRET||"missing-secret").update(token).digest("hex"); }
 function parseCookies(req){
   const out={};
@@ -190,6 +210,25 @@ async function writePlayedDB(db){
   );
 }
 
+function normalizeStoredTierPoints(db){
+  let changed=false;
+  for(const player of (db.players||[])){
+    if(!player.rankings) player.rankings={};
+    let total=0;
+    for(const ranking of Object.values(player.rankings)){
+      const pts=pointsForTier(ranking?.rank);
+      if(pts && Number(ranking.points)!==pts){ ranking.points=pts; changed=true; }
+      total += Number(ranking?.points||0);
+    }
+    if(Number(player.points||0)!==total){ player.points=total; changed=true; }
+  }
+  for(const test of (db.tests||[])){
+    const pts=pointsForTier(test?.rank);
+    if(pts && Number(test.points)!==pts){ test.points=pts; changed=true; }
+  }
+  return changed;
+}
+
 async function initDatabase(){
   await pool.query(`
     CREATE TABLE IF NOT EXISTS onyx_store (
@@ -232,6 +271,10 @@ async function initDatabase(){
       playedCache = {players:[]};
     }
     await writePlayedDB(playedCache);
+  }
+
+  if(normalizeStoredTierPoints(dbCache)){
+    await writeDB(dbCache);
   }
 
   console.log(`Persistent PostgreSQL storage ready: ${dbCache.players.length} ONYX players, ${playedCache.players.length} played players.`);
@@ -306,7 +349,7 @@ function body(req){
     let d="";req.on("data",c=>d+=c);req.on("end",()=>{try{resolve(d?JSON.parse(d):{})}catch{resolve({})}});
   });
 }
-const mime={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".gif":"image/gif",".svg":"image/svg+xml"};
+const mime={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".gif":"image/gif"};
 
 const server = http.createServer(async(req,res)=>{
   const origin=req.headers.origin;
@@ -381,10 +424,10 @@ const server = http.createServer(async(req,res)=>{
       p.name=playedPlayer.name||p.name;
       p.uuid=playedPlayer.uuid||p.uuid;
       if(!p.rankings)p.rankings={};
-      p.rankings[kit]={rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"};
+      p.rankings[kit]={rank,points:pointsForTier(rank),tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP sync"};
       p.points=Object.values(p.rankings).reduce((sum,v)=>sum+Number(v?.points||0),0);
       if(!Array.isArray(db.tests))db.tests=[];
-      db.tests.push({playerId:p.id,kit,rank,points:elo,tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP ELO"});
+      db.tests.push({playerId:p.id,kit,rank,points:pointsForTier(rank),tester:"OnyxPvP",date:new Date().toISOString(),notes:"Ranked PvP sync"});
       await writeDB(db);
       return sendJSON(res,{ok:true,player:p,kit,elo,rank});
     }
@@ -553,10 +596,17 @@ const server = http.createServer(async(req,res)=>{
       );
       if(!playedPlayer)throw new Error("Player is not in the PLAYED database.");
       if(!p.rankings)p.rankings={};
-      p.rankings[x.kit]={rank:x.rank,points:Number(x.points||0),tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""};
+      const normalizedRank=normalizeTier(x.rank);
+      const tierPoints=pointsForTier(normalizedRank);
+      if(!tierPoints) throw new Error("Invalid tier. Use LT5, HT5, LT4, HT4, LT3, HT3, LT2, HT2, LT1, or HT1.");
+      p.rankings[x.kit]={rank:normalizedRank,points:tierPoints,tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""};
       p.points=Object.values(p.rankings).reduce((s,v)=>s+Number(v.points||0),0);
-      db.tests.push({playerId:p.id,kit:x.kit,rank:x.rank,points:Number(x.points||0),tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""});
+      db.tests.push({playerId:p.id,kit:x.kit,rank:normalizedRank,points:tierPoints,tester:x.tester||"ONYX",date:new Date().toISOString(),notes:x.notes||""});
       await writeDB(db); res.writeHead(200,{"Content-Type":"application/json"}); return res.end(JSON.stringify(p));
+    }
+
+    if(u.pathname==="/api/tiers/points" && req.method==="GET"){
+      return sendJSON(res,TIER_POINTS);
     }
 
     if(u.pathname==="/api/mcpvp/players" && req.method==="GET"){
