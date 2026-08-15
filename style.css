@@ -473,3 +473,27 @@ a{color:inherit}
   .tier-tab{min-width:65px;height:49px;padding:5px 9px}
   .tier-tab span{font-size:14px}
 }
+
+
+/* ONYX Minecraft-like typography */
+@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap');
+
+:root{
+  --onyx-font: "Pixelify Sans", "Courier New", monospace;
+}
+
+html, body, button, input, textarea, select,
+h1, h2, h3, h4, h5, h6, p, a, span, div, label,
+table, th, td, strong, b, em, small, code, pre{
+  font-family: var(--onyx-font) !important;
+  letter-spacing: .015em;
+}
+
+button, input, textarea, select{
+  font-family: var(--onyx-font) !important;
+}
+
+h1, h2, h3, .brand, .nav a, .gamemode-tab,
+.tier-tab, .leader-name, .leader-rank{
+  font-weight: 700;
+}
