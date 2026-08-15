@@ -476,10 +476,9 @@ a{color:inherit}
 
 
 /* ONYX Minecraft-like typography */
-@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
 :root{
-  --onyx-font: "Pixelify Sans", "Courier New", monospace;
+  --onyx-font: "Silkscreen", "Courier New", monospace;
 }
 
 html, body, button, input, textarea, select,
@@ -496,4 +495,11 @@ button, input, textarea, select{
 h1, h2, h3, .brand, .nav a, .gamemode-tab,
 .tier-tab, .leader-name, .leader-rank{
   font-weight: 700;
+}
+
+/* ONYX global lower-pixel typography */
+html, body, button, input, textarea, select,
+h1, h2, h3, h4, h5, h6, p, a, span, div, label,
+table, th, td, strong, b, em, small, code, pre{
+  font-family: var(--onyx-font) !important;
 }
