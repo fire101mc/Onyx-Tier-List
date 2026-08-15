@@ -260,3 +260,147 @@ a{color:inherit}
   .premium-table .avatar{flex-basis:50px;width:50px;height:64px}
   .premium-table .avatar-full img{height:62px;max-width:47px}
 }
+
+
+/* ONYX gamemode tier sections — MCTiers-inspired grouping, ONYX theme */
+.mode-tier-section{
+  margin:0 0 18px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:14px;
+  overflow:hidden;
+  background:linear-gradient(180deg,rgba(12,16,14,.94),rgba(7,10,9,.94));
+  box-shadow:0 14px 34px rgba(0,0,0,.20);
+}
+.mode-tier-heading{
+  min-height:70px;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  background:
+    radial-gradient(circle at 15% 0%,rgba(247,201,87,.10),transparent 38%),
+    rgba(15,20,17,.92);
+}
+.mode-tier-kicker{
+  display:block;
+  color:var(--gold);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.18em;
+  margin-bottom:4px;
+}
+.mode-tier-heading h3{
+  margin:0;
+  font-family:'Russo One',Inter,sans-serif;
+  font-size:21px;
+  letter-spacing:.02em;
+  color:#f2f4ef;
+}
+.mode-tier-variants{display:flex;gap:6px;align-items:center}
+.variant-pill{
+  min-width:42px;
+  padding:6px 9px;
+  border-radius:7px;
+  text-align:center;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.08em;
+  border:1px solid rgba(255,255,255,.10);
+}
+.variant-lt{color:#d7ddd6;background:rgba(255,255,255,.035)}
+.variant-ht{color:var(--gold-soft);background:rgba(244,191,58,.08);border-color:rgba(244,191,58,.22)}
+.mode-tier-table-head,.mode-player-row{
+  display:grid;
+  grid-template-columns:54px minmax(240px,1fr) 130px 100px;
+  align-items:center;
+}
+.mode-tier-table-head{
+  min-height:38px;
+  padding:0 18px;
+  color:#747d75;
+  background:rgba(255,255,255,.018);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.16em;
+}
+.mode-player-row{
+  min-height:76px;
+  padding:8px 18px;
+  border-top:1px solid rgba(255,255,255,.065);
+  transition:background .14s,transform .14s;
+}
+.mode-player-row:hover{
+  background:rgba(247,201,87,.035);
+}
+.mode-player-pos{
+  color:#7e877f;
+  font-size:13px;
+  font-weight:900;
+}
+.mode-player-main{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.mode-player-name-wrap{min-width:0}
+.mode-player-name-wrap .leader-name{font-size:14px}
+.mode-tier-badge{
+  justify-self:start;
+  min-width:84px;
+  height:42px;
+  padding:4px 8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.025);
+}
+.mode-tier-badge img{
+  width:25px;
+  height:25px;
+  object-fit:contain;
+}
+.mode-tier-badge strong{
+  font-family:'Russo One',Inter,sans-serif;
+  font-size:12px;
+}
+.tier-badge-ht1,.tier-badge-lt1{box-shadow:inset 0 0 20px rgba(247,201,87,.07)}
+.tier-badge-ht1 strong,.tier-badge-lt1 strong{color:#f7c957}
+.tier-badge-ht2 strong,.tier-badge-lt2 strong{color:#d9aef7}
+.tier-badge-ht3 strong,.tier-badge-lt3 strong{color:#75d7ff}
+.tier-badge-ht4 strong,.tier-badge-lt4 strong{color:#75e3a1}
+.tier-badge-ht5 strong,.tier-badge-lt5 strong{color:#c5c9c6}
+.mode-points{
+  justify-self:end;
+  text-align:right;
+  color:var(--gold-soft);
+  font-family:'Russo One',Inter,sans-serif;
+  font-size:15px;
+}
+.mode-points span{
+  display:block;
+  margin-top:3px;
+  color:#6f786f;
+  font-family:Inter,sans-serif;
+  font-size:7px;
+  letter-spacing:.13em;
+}
+@media(max-width:760px){
+  .mode-tier-table-head,.mode-player-row{
+    grid-template-columns:36px minmax(170px,1fr) 90px 68px;
+    padding-left:12px;
+    padding-right:12px;
+  }
+  .mode-tier-heading{padding:12px}
+  .mode-tier-variants{display:none}
+  .mode-tier-badge{min-width:70px}
+  .mode-tier-badge img{width:20px;height:20px}
+  .mode-player-row{min-height:68px}
+  .mode-player-main .leader-skin{width:34px;height:42px}
+  .mode-player-main .leader-skin img{width:31px;height:38px}
+}

@@ -58,7 +58,7 @@ const TIER_POINTS = Object.freeze({
   HT4: 4,
   LT3: 6,
   HT3: 10,
-  LT2: 15,
+  LT2: 20,
   HT2: 30,
   LT1: 45,
   HT1: 60

@@ -103,7 +103,7 @@ function filteredPlayers(){
 }
 
 function tierPointsFor(tier){
-  const points = {LT5:1,HT5:2,LT4:3,HT4:4,LT3:6,HT3:10,LT2:15,HT2:30,LT1:45,HT1:60};
+  const points = {LT5:1,HT5:2,LT4:3,HT4:4,LT3:6,HT3:10,LT2:20,HT2:30,LT1:45,HT1:60};
   return points[rawTier(tier)] ?? 0;
 }
 
@@ -189,6 +189,10 @@ function modeRankChip(player, key){
     </span>`;
 }
 
+
+function highestTierForMode(player, mode){
+  return rawTier(player?.rankings?.[mode]);
+}
 function renderHomePlayers(){
   const list = document.getElementById("playerList");
   if(!list) return;
@@ -200,8 +204,90 @@ function renderHomePlayers(){
 
   if(q) data = data.filter(p => String(p.name || "").toLowerCase().includes(q));
 
+  if(activeMode !== "overall"){
+    // MCTiers-inspired organization: players are grouped into Tier 1 -> Tier 5.
+    // Each tier contains LT/HT variants, with the player's exact tier shown beside them.
+    const tierGroups = [
+      {num:1, high:"HT1", low:"LT1"},
+      {num:2, high:"HT2", low:"LT2"},
+      {num:3, high:"HT3", low:"LT3"},
+      {num:4, high:"HT4", low:"LT4"},
+      {num:5, high:"HT5", low:"LT5"}
+    ];
+
+    const grouped = tierGroups.map(group => {
+      const members = data
+        .filter(p => {
+          const tier = rawTier(p?.rankings?.[activeMode]);
+          return tier === group.high || tier === group.low;
+        })
+        .sort((a,b) =>
+          tierScore(highestTierForMode(b, activeMode)) - tierScore(highestTierForMode(a, activeMode)) ||
+          String(a.name).localeCompare(String(b.name))
+        );
+      return {...group, members};
+    });
+
+    if(!grouped.some(g => g.members.length)){
+      list.innerHTML = `<div class="empty-onyx">No ONYX-tested players in this gamemode yet.</div>`;
+      return;
+    }
+
+    list.innerHTML = grouped.filter(g => g.members.length).map(group => {
+      const modeMeta = KIT_META[activeMode];
+      const rows = group.members.map((p, i) => {
+        const tier = rawTier(p?.rankings?.[activeMode]);
+        const points = rankingPoints(p?.rankings?.[activeMode]);
+        const skin = playerSkinUrl(p);
+        const tierClassName = tier.toLowerCase();
+
+        return `
+          <div class="mode-player-row">
+            <div class="mode-player-pos">${i + 1}</div>
+            <div class="mode-player-main">
+              <div class="leader-skin">
+                ${skin ? `<img src="${skin}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+              </div>
+              <div class="mode-player-name-wrap">
+                <a class="leader-name" href="player.html?name=${encodeURIComponent(p.name)}">${escapeHtml(p.name)}</a>
+                <div class="leader-region"><i></i>${escapeHtml(p.region || "—")}</div>
+              </div>
+            </div>
+            <div class="mode-tier-badge tier-badge-${tierClassName}" title="${escapeHtml(modeMeta.label)} • ${points} point${points === 1 ? "" : "s"}">
+              <img src="${modeMeta.image}" alt="" loading="lazy">
+              <strong>${escapeHtml(tier)}</strong>
+            </div>
+            <div class="mode-points">${points}<span>POINT${points === 1 ? "" : "S"}</span></div>
+          </div>`;
+      }).join("");
+
+      return `
+        <section class="mode-tier-section">
+          <div class="mode-tier-heading">
+            <div>
+              <span class="mode-tier-kicker">ONYX RANKINGS</span>
+              <h3>Tier ${group.num}</h3>
+            </div>
+            <div class="mode-tier-variants">
+              <span class="variant-pill variant-lt">LT${group.num}</span>
+              <span class="variant-pill variant-ht">HT${group.num}</span>
+            </div>
+          </div>
+          <div class="mode-tier-table">
+            <div class="mode-tier-table-head">
+              <span>#</span><span>PLAYER</span><span>TIER</span><span>POINTS</span>
+            </div>
+            ${rows}
+          </div>
+        </section>`;
+    }).join("");
+
+    return;
+  }
+
+  // Overall keeps the ONYX leaderboard style and shows every tested kit.
   data = data
-    .filter(p => activeMode === "overall" ? highestTier(p) : rawTier(p?.rankings?.[activeMode]))
+    .filter(p => highestTier(p))
     .sort((a,b) =>
       playerModeScore(b, activeMode) - playerModeScore(a, activeMode) ||
       String(a.name).localeCompare(String(b.name))
@@ -210,11 +296,11 @@ function renderHomePlayers(){
   const shown = data.slice(0, 12);
 
   if(!shown.length){
-    list.innerHTML = `<div class="empty-onyx">No ONYX-tested players in this gamemode yet.</div>`;
+    list.innerHTML = `<div class="empty-onyx">No ONYX-tested players yet.</div>`;
     return;
   }
 
-  const headerMode = activeMode === "overall" ? "KIT RANKS" : `${MODES[activeMode].label.toUpperCase()} RANK`;
+  const headerMode = "KIT RANKS";
 
   list.innerHTML = `
     <div class="leaderboard-head">
@@ -223,17 +309,9 @@ function renderHomePlayers(){
     ${shown.map((p,i) => {
       const rankNumber = competitionRank(shown, i, activeMode);
       const skin = playerSkinUrl(p);
-      const chips = activeMode === "overall"
-        ? KIT_KEYS.map(k => p.rankings?.[k] ? modeRankChip(p,k) : "").filter(Boolean).join("")
-        : modeRankChip(p, activeMode);
-
-      const selectedTier = activeMode === "overall"
-        ? highestTier(p)
-        : rawTier(p?.rankings?.[activeMode]);
-
-      const selectedPoints = activeMode === "overall"
-        ? overallPoints(p)
-        : rankingPoints(p?.rankings?.[activeMode]);
+      const chips = KIT_KEYS.map(k => p.rankings?.[k] ? modeRankChip(p,k) : "").filter(Boolean).join("");
+      const selectedTier = highestTier(p);
+      const selectedPoints = overallPoints(p);
 
       return `
         <div class="leader-row">
