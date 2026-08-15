@@ -107,6 +107,34 @@ function tierPointsFor(tier){
   return points[rawTier(tier)] ?? 0;
 }
 
+function rankingPoints(ranking){
+  const tier = rawTier(ranking);
+  // ELO/rating is deliberately NOT used as website points.
+  // An unranked gamemode always has exactly 0 points.
+  if(!tier || tierPointsFor(tier) === 0) return 0;
+  return tierPointsFor(tier);
+}
+
+function overallPoints(player){
+  const testedTiers = Object.values(player?.rankings || {})
+    .map(rawTier)
+    .filter(t => tierPointsFor(t) > 0);
+  if(!testedTiers.length) return 0;
+  return testedTiers.reduce((sum, tier) => sum + tierPointsFor(tier), 0);
+}
+
+function competitionRank(sortedPlayers, index, mode){
+  if(index === 0) return 1;
+  const current = mode === "overall"
+    ? overallPoints(sortedPlayers[index])
+    : rankingPoints(sortedPlayers[index]?.rankings?.[mode]);
+  const previous = mode === "overall"
+    ? overallPoints(sortedPlayers[index - 1])
+    : rankingPoints(sortedPlayers[index - 1]?.rankings?.[mode]);
+  if(current === previous) return competitionRank(sortedPlayers, index - 1, mode);
+  return index + 1;
+}
+
 function rankingForMode(player, mode){
   if(mode === "overall") return null;
   return player?.rankings?.[mode] ?? null;
@@ -139,14 +167,15 @@ function renderGamemodeTabs(){
 }
 
 function playerModeScore(player, mode){
-  if(mode === "overall") return tierScore(highestTier(player));
-  return tierScore(rawTier(player?.rankings?.[mode]));
+  return mode === "overall"
+    ? overallPoints(player)
+    : rankingPoints(player?.rankings?.[mode]);
 }
 
 function modeRankChip(player, key){
   const ranking = rankingForMode(player, key);
   const tier = rawTier(ranking);
-  const points = Number(ranking?.points ?? tierPointsFor(tier));
+  const points = rankingPoints(ranking);
   const meta = KIT_META[key];
   if(!meta) return "";
 
@@ -192,6 +221,7 @@ function renderHomePlayers(){
       <span>#</span><span>PLAYER</span><span>${headerMode}</span><span>POINTS</span>
     </div>
     ${shown.map((p,i) => {
+      const rankNumber = competitionRank(shown, i, activeMode);
       const skin = playerSkinUrl(p);
       const chips = activeMode === "overall"
         ? KIT_KEYS.map(k => p.rankings?.[k] ? modeRankChip(p,k) : "").filter(Boolean).join("")
@@ -202,12 +232,12 @@ function renderHomePlayers(){
         : rawTier(p?.rankings?.[activeMode]);
 
       const selectedPoints = activeMode === "overall"
-        ? Number(p.points || 0)
-        : Number(p?.rankings?.[activeMode]?.points ?? tierPointsFor(selectedTier));
+        ? overallPoints(p)
+        : rankingPoints(p?.rankings?.[activeMode]);
 
       return `
         <div class="leader-row">
-          <div class="leader-rank">${i+1}</div>
+          <div class="leader-rank">${rankNumber}</div>
           <div class="leader-player">
             <div class="leader-skin">${skin ? `<img src="${skin}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</div>
             <div>
