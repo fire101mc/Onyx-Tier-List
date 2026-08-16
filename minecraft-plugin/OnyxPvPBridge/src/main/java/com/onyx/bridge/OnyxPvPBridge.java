@@ -77,8 +77,8 @@ public final class OnyxPvPBridge extends JavaPlugin implements Listener, Command
   private int getElo(UUID u,String mode)throws Exception{Map<String,Integer> m=elo().get(u);return m==null?1000:m.getOrDefault(mode,1000);}
   private String tier(int e){
     try {
-      String best=getConfig().getString("elo.default-tier","LT5"); int bp=Integer.MIN_VALUE;
-      var sec=getConfig().getConfigurationSection("elo.tiers"); if(sec!=null) for(String k:sec.getKeys(false)){int p=sec.getInt(k);if(p<=e&&p>bp){bp=p;best=k;}}
+      var c=onyx.getConfig(); String best=c.getString("elo.default-tier","LT5"); int bp=Integer.MIN_VALUE;
+      var sec=c.getConfigurationSection("elo.tiers"); if(sec!=null) for(String k:sec.getKeys(false)){int p=sec.getInt(k);if(p<=e&&p>bp){bp=p;best=k;}}
       return best;
     }catch(Exception ex){return "LT5";}
   }
