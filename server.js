@@ -376,14 +376,22 @@ async function syncOnyxDiscordResults(db){
         }
       }
 
-      if(changed) await writeDB(db);
+      let persisted=true;
+      if(changed){
+        try{
+          await writeDB(db);
+        }catch(dbError){
+          persisted=false;
+          console.warn(`[ONYX] Results were imported in memory, but PostgreSQL save failed: ${dbError.message}`);
+        }
+      }
       onyxResultsLastSync=Date.now();
-      console.log(`[ONYX] Discord results sync: ${latest.size} latest player/gamemode results checked${changed ? ", database updated." : "."}`);
-      return changed;
+      console.log(`[ONYX] Discord results sync: ${latest.size} latest player/gamemode results checked${changed ? (persisted ? ", database updated." : ", database save failed.") : "."}`);
+      return {ok:true,changed,count:latest.size,persisted};
     }catch(error){
       console.warn(`[ONYX] Discord results sync failed: ${error.message}`);
       onyxResultsLastSync=Date.now();
-      return false;
+      return {ok:false,changed:false,count:0,persisted:false,error:error.message};
     }finally{
       onyxResultsSyncPromise=null;
     }
@@ -419,7 +427,7 @@ async function writePlayedDB(db){
 
 function normalizeStoredTierPoints(db){
   let changed=false;
-  const kitAliases={crystal:"vanilla",nethpot:"nethop",diapot:"pot",nodebuff:"pot",builduhc:"uhc"};
+  const kitAliases={nethpot:"nethop",diapot:"pot",nodebuff:"pot",builduhc:"uhc"};
   for(const player of (db.players||[])){
     if(!player.rankings) player.rankings={};
     let total=0;
@@ -754,11 +762,11 @@ const server = http.createServer(async(req,res)=>{
     }
 
     // Manual Discord-result refresh. The Discord bot can call this after /results.
-    if(u.pathname==="/api/onyx/sync-discord" && req.method==="POST"){
+    if(u.pathname==="/api/onyx/sync-discord" && (req.method==="POST" || req.method==="GET")){
       if(!adminOrIngest(req,res)) return authError(res);
       onyxResultsLastSync=0;
-      const changed=await syncOnyxDiscordResults(db);
-      return sendJSON(res,{ok:true,changed,source:ONYX_RESULTS_API_URL});
+      const result=await syncOnyxDiscordResults(db);
+      return sendJSON(res,{...result,source:ONYX_RESULTS_API_URL});
     }
 
     if(u.pathname==="/api/onyx/player" && req.method==="POST"){
@@ -928,7 +936,12 @@ const server = http.createServer(async(req,res)=>{
 });
 
 initDatabase()
-  .then(()=>server.listen(PORT,()=>console.log(`Onyx Tier List running at http://localhost:${PORT}`)))
+  .then(async()=>{
+    // Pull Discord tier results immediately on boot.
+    await syncOnyxDiscordResults(dbCache);
+    setInterval(()=>syncOnyxDiscordResults(dbCache), ONYX_RESULTS_SYNC_MS);
+    server.listen(PORT,()=>console.log(`Onyx Tier List running at http://localhost:${PORT}`));
+  })
   .catch(err=>{
     console.error("Failed to initialize PostgreSQL storage:", err);
     process.exit(1);

@@ -1,40 +1,40 @@
-# ONYX Discord Results Sync
+# ONYX Discord Results Sync — FIXED
 
-ONYX now imports tier-test results from:
+The ONYX server automatically polls:
 
 https://tierlist-bot.vercel.app/api/onyx-tiers
 
-## Flow
+every 15 seconds and immediately once when the server starts.
 
-1. The Discord bot runs `/results` and publishes the new results to its API.
-2. ONYX requests that API when `/api/onyx/players` is loaded.
-3. ONYX keeps the newest result for each player + gamemode.
-4. Results are stored in the existing PostgreSQL `onyx_store`.
-5. The website displays the imported tier and ONYX points.
-6. An open website automatically refreshes every 30 seconds.
+When the Discord bot's `/results` command causes a new result to appear in
+that API, ONYX imports it automatically.
 
-## Gamemode mapping
+The website also refreshes its displayed data periodically.
 
-- `sword` -> `sword`
-- `smp` -> `smp`
-- `uhc` -> `uhc`
-- `axe_pvp` -> `axe`
-- `netherite_pot` -> `nethop`
-- `diamond_pot` -> `pot`
-- `crystal_pvp` / `crystal` -> `vanilla` (matching the current ONYX Crystal -> Vanilla project decision)
-- `vanilla` -> `vanilla`
-- `mace` -> `mace`
+## Important behavior
 
-## Tier points
+- Newest result per Discord user + gamemode becomes the active tier.
+- `resultId` prevents duplicate history entries.
+- `rankEarned` such as `High Tier 1` becomes `HT1`.
+- Points are authoritative:
+  LT5=1, HT5=2, LT4=3, HT4=4, LT3=6, HT3=10,
+  LT2=20, HT2=30, LT1=45, HT1=60.
+- Discord IDs/usernames, tester, region, previous rank and timestamp are stored.
+- Crystal PvP and Vanilla are kept as SEPARATE gamemodes.
+- Netherite Pot -> NethOP.
+- Diamond Pot -> Pot.
+- Axe PvP -> Axe.
+- UHC -> UHC.
+- Sword -> Sword.
+- SMP -> SMP.
 
-LT5 1, HT5 2, LT4 3, HT4 4, LT3 6, HT3 10, LT2 20, HT2 30, LT1 45, HT1 60.
+## Testing
 
-The `resultId` is used to prevent duplicate history imports.
+After deploying, open:
 
-## Manual refresh endpoint
+GET /api/onyx/sync-discord
 
-The server also exposes:
+It should return JSON showing `ok`, `count`, `changed`, and `persisted`.
 
-POST `/api/onyx/sync-discord`
-
-It requires the existing ONYX ingest token or an authenticated admin session.
+The source should be:
+https://tierlist-bot.vercel.app/api/onyx-tiers

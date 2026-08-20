@@ -5,6 +5,7 @@ const PLAYED_API_URL = CONFIG.PLAYED_PLAYERS_API_URL || "/api/players/played";
 const MODES = {
   overall:{title:"Onyx Tier List",label:"Overall",desc:"All ranked PvP kits combined.",key:null},
   vanilla:{title:"Vanilla Tier List",label:"Vanilla",desc:"Vanilla PvP rankings.",key:"vanilla"},
+  crystal:{title:"Crystal PvP Tier List",label:"Crystal PvP",desc:"Crystal PvP rankings.",key:"crystal"},
   sword:{title:"Sword Tier List",label:"Sword",desc:"Sword PvP rankings.",key:"sword"},
   axe:{title:"Axe Tier List",label:"Axe",desc:"Axe PvP rankings.",key:"axe"},
   pot:{title:"Pot Tier List",label:"Pot",desc:"Pot PvP rankings.",key:"pot"},
@@ -74,6 +75,7 @@ function playerBodyUrl(p){
 }
 const KIT_META={
   vanilla:{label:"Vanilla",short:"VANILLA",image:"assets/kits/vanilla.png"},
+  crystal:{label:"Crystal PvP",short:"CRYSTAL",image:"assets/kits/vanilla.png"},
   sword:{label:"Sword",short:"SWORD",image:"assets/kits/sword.png"},
   axe:{label:"Axe",short:"AXE",image:"assets/kits/axe.png"},
   pot:{label:"Pot",short:"POT",image:"assets/kits/pot.png"},
@@ -145,7 +147,7 @@ function renderGamemodeTabs(){
   const target = document.getElementById("gamemodeTabs");
   if(!target) return;
 
-  const order = ["overall","vanilla","uhc","pot","nethop","smp","sword","axe","mace"];
+  const order = ["overall","vanilla","crystal","uhc","pot","nethop","smp","sword","axe","mace"];
   target.innerHTML = order.map(key => {
     const mode = MODES[key];
     const image = KIT_META[key]?.image || "assets/kits/overall.png";
