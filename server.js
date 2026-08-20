@@ -37,6 +37,15 @@ const pool = new Pool({
 let dbCache = {players:[], tests:[]};
 let playedCache = {players:[]};
 const ONYX_INGEST_TOKEN = process.env.ONYX_INGEST_TOKEN || "";
+// Discord tier-result source. The Discord bot publishes results here when /results is used.
+// ONYX imports the newest result for each player + gamemode into its PostgreSQL-backed data.
+const ONYX_RESULTS_API_URL =
+  process.env.ONYX_RESULTS_API_URL ||
+  "https://tierlist-bot.vercel.app/api/onyx-tiers";
+const ONYX_RESULTS_SYNC_MS = 15 * 1000;
+let onyxResultsLastSync = 0;
+let onyxResultsSyncPromise = null;
+
 const MCPVP_DATA = "https://www.mcpvp.com/tiers/data";
 const MCPVP_HTML = "https://www.mcpvp.com/tiers";
 
@@ -183,6 +192,204 @@ async function enrichSkinList(list){
   for(let i=0;i<list.length;i+=5)
     await Promise.all(list.slice(i,i+5).map(enrichSkin));
   return list;
+}
+
+
+function normalizeExternalGamemode(value){
+  const key=String(value||"").trim().toLowerCase();
+  const aliases={
+    smp:"smp",
+    sword:"sword",
+    vanilla:"vanilla",
+    uhc:"uhc",
+    netherite_pot:"nethop",
+    nethpot:"nethop",
+    nethop:"nethop",
+    diamond_pot:"pot",
+    diapot:"pot",
+    pot:"pot",
+    nodebuff:"pot",
+    axe_pvp:"axe",
+    axe:"axe",
+    crystal_pvp:"vanilla",
+    crystal:"vanilla",
+    builduhc:"uhc",
+    mace:"mace"
+  };
+  return aliases[key] || key;
+}
+
+function normalizeExternalRegion(value){
+  const key=String(value||"").trim();
+  const aliases={
+    "Asia":"AS",
+    "North America":"NA",
+    "South America":"SA",
+    "Europe":"EU",
+    "Oceania":"OC",
+    "Africa":"AF",
+    "Antarctica":"AN"
+  };
+  return aliases[key] || key || "—";
+}
+
+function normalizeExternalRank(value){
+  const raw=String(value||"").trim().toUpperCase();
+  const aliases={
+    "LOW TIER 5":"LT5","HIGH TIER 5":"HT5",
+    "LOW TIER 4":"LT4","HIGH TIER 4":"HT4",
+    "LOW TIER 3":"LT3","HIGH TIER 3":"HT3",
+    "LOW TIER 2":"LT2","HIGH TIER 2":"HT2",
+    "LOW TIER 1":"LT1","HIGH TIER 1":"HT1",
+    "LOW TIER 5":"LT5","HIGH TIER 5":"HT5",
+    "NO RANK":""
+  };
+  return aliases[raw] ?? raw;
+}
+
+function externalResultTimestamp(result){
+  const t=Date.parse(String(result?.timestamp||""));
+  return Number.isFinite(t) ? t : 0;
+}
+
+async function syncOnyxDiscordResults(db){
+  const now=Date.now();
+  if(onyxResultsSyncPromise) return onyxResultsSyncPromise;
+  if(now-onyxResultsLastSync < ONYX_RESULTS_SYNC_MS) return false;
+
+  onyxResultsSyncPromise=(async()=>{
+    try{
+      const results=await getJSON(ONYX_RESULTS_API_URL);
+      if(!Array.isArray(results)){
+        throw new Error("Discord results API did not return an array");
+      }
+
+      if(!Array.isArray(db.players)) db.players=[];
+      if(!Array.isArray(db.tests)) db.tests=[];
+
+      // Keep the newest external result for every player + normalized gamemode.
+      const latest=new Map();
+      for(const result of results){
+        const name=String(result?.username||"").trim();
+        const kit=normalizeExternalGamemode(result?.gamemodeKey || result?.gamemode);
+        const rank=normalizeExternalRank(result?.rankEarned);
+        if(!name || !kit || !rank || !pointsForTier(rank)) continue;
+
+        const identity=String(result?.discordUserId||name).toLowerCase();
+        const key=`${identity}::${kit}`;
+        const current=latest.get(key);
+        if(!current || externalResultTimestamp(result)>externalResultTimestamp(current)){
+          latest.set(key,result);
+        }
+      }
+
+      let changed=false;
+
+      for(const result of latest.values()){
+        const name=String(result.username).trim();
+        const kit=normalizeExternalGamemode(result.gamemodeKey || result.gamemode);
+        const rank=normalizeExternalRank(result.rankEarned);
+        const points=pointsForTier(rank);
+        const resultId=String(result.resultId||"").trim();
+        const timestamp=new Date(
+          externalResultTimestamp(result) || Date.now()
+        ).toISOString();
+
+        let p=db.players.find(v =>
+          String(v.name||"").trim().toLowerCase()===name.toLowerCase() ||
+          (result.discordUserId &&
+            String(v.discordUserId||"")===String(result.discordUserId))
+        );
+
+        if(!p){
+          p={
+            id: result.discordUserId || ("discord_"+Date.now().toString(36)),
+            name,
+            uuid:"",
+            discordUserId:String(result.discordUserId||""),
+            discordUsername:String(result.discordUsername||""),
+            region:normalizeExternalRegion(result.region),
+            points:0,
+            rankings:{},
+            testedAt:timestamp,
+            source:"tierlist-bot.vercel.app/api/onyx-tiers"
+          };
+          db.players.push(p);
+          changed=true;
+        }
+
+        if(!p.rankings) p.rankings={};
+
+        const existing=p.rankings[kit];
+        const existingTime=Date.parse(String(existing?.date||"")) || 0;
+        const incomingTime=externalResultTimestamp(result);
+
+        // Never let an older Discord result overwrite a newer local/external result.
+        if(existing && existingTime>incomingTime) continue;
+
+        const nextRanking={
+          rank,
+          points,
+          tester:String(result.tester||"ONYX"),
+          date:timestamp,
+          previousRank:String(result.previousRank||"No Rank"),
+          discordUserId:String(result.discordUserId||p.discordUserId||""),
+          discordUsername:String(result.discordUsername||p.discordUsername||""),
+          resultId,
+          source:"tierlist-bot.vercel.app/api/onyx-tiers"
+        };
+
+        const same=existing &&
+          String(existing.rank||"")===rank &&
+          Number(existing.points||0)===points &&
+          String(existing.resultId||"")===resultId;
+
+        p.name=name || p.name;
+        p.discordUserId=nextRanking.discordUserId || p.discordUserId || "";
+        p.discordUsername=nextRanking.discordUsername || p.discordUsername || "";
+        p.region=normalizeExternalRegion(result.region) || p.region || "—";
+        p.rankings[kit]=nextRanking;
+        p.testedAt=timestamp;
+        p.points=Object.values(p.rankings).reduce(
+          (sum,v)=>sum+Number(v?.points||0),0
+        );
+
+        if(!same) changed=true;
+
+        // Keep an import history, but never duplicate the same resultId.
+        if(resultId && !db.tests.some(t=>String(t?.resultId||"")===resultId)){
+          db.tests.push({
+            playerId:p.id,
+            kit,
+            rank,
+            points,
+            tester:nextRanking.tester,
+            date:timestamp,
+            previousRank:nextRanking.previousRank,
+            discordUserId:nextRanking.discordUserId,
+            discordUsername:nextRanking.discordUsername,
+            resultId,
+            source:"tierlist-bot.vercel.app/api/onyx-tiers",
+            notes:"Imported from Discord tier-results API"
+          });
+          changed=true;
+        }
+      }
+
+      if(changed) await writeDB(db);
+      onyxResultsLastSync=Date.now();
+      console.log(`[ONYX] Discord results sync: ${latest.size} latest player/gamemode results checked${changed ? ", database updated." : "."}`);
+      return changed;
+    }catch(error){
+      console.warn(`[ONYX] Discord results sync failed: ${error.message}`);
+      onyxResultsLastSync=Date.now();
+      return false;
+    }finally{
+      onyxResultsSyncPromise=null;
+    }
+  })();
+
+  return onyxResultsSyncPromise;
 }
 
 function readDB(){
@@ -516,6 +723,8 @@ const server = http.createServer(async(req,res)=>{
 
     // Tier-tested database: only players actually tested by ONYX appear in rankings.
     if(u.pathname==="/api/onyx/players" && req.method==="GET"){
+      // Pull the newest Discord tier-test results before the website reads rankings.
+      await syncOnyxDiscordResults(db);
       const played=readPlayedDB();
       const playedByName=new Map(played.players.map(p=>[String(p.name||"").toLowerCase(),p]));
       for(const p of db.players){
@@ -542,6 +751,14 @@ const server = http.createServer(async(req,res)=>{
       await writeDB(db);
       res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
       return res.end(JSON.stringify(db.players));
+    }
+
+    // Manual Discord-result refresh. The Discord bot can call this after /results.
+    if(u.pathname==="/api/onyx/sync-discord" && req.method==="POST"){
+      if(!adminOrIngest(req,res)) return authError(res);
+      onyxResultsLastSync=0;
+      const changed=await syncOnyxDiscordResults(db);
+      return sendJSON(res,{ok:true,changed,source:ONYX_RESULTS_API_URL});
     }
 
     if(u.pathname==="/api/onyx/player" && req.method==="POST"){

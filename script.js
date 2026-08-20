@@ -445,3 +445,16 @@ document.addEventListener("DOMContentLoaded",()=>{
   if(document.getElementById("allPlayers")) loadMcpvpData();
   if(document.getElementById("profileRoot")) loadMcpvpData();
 });
+
+
+// Keep an open ONYX page in sync after the Discord bot publishes new /results.
+const ONYX_DISCORD_AUTO_REFRESH_MS = 30000;
+setInterval(() => {
+  if(document.visibilityState === "visible" &&
+     (document.getElementById("playerList") ||
+      document.getElementById("tierCards") ||
+      document.getElementById("allPlayers") ||
+      document.getElementById("profileRoot"))){
+    loadMcpvpData();
+  }
+}, ONYX_DISCORD_AUTO_REFRESH_MS);
